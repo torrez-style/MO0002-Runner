@@ -1,4 +1,4 @@
-
+"""Módulo de gestión de eventos para el juego"""
 
 class Evento:
     """Clase base para todos los eventos"""
@@ -11,18 +11,23 @@ class EventoSalir(Evento):
 class EventoMoverJugador(Evento):
     """Evento cuando el jugador se mueve"""
     def __init__(self, direccion):
-        self.direccion = direccion  # 'arriba', 'abajo', 'izquierda', 'derecha'
+        self.direccion = direccion
 
 class EventoRecogerEstrella(Evento):
     """Evento cuando el jugador recoge una estrella"""
     def __init__(self, posicion):
-        self.posicion = posicion  # tupla (x, y) en celdas
+        self.posicion = posicion
 
 class EventoColisionEnemigo(Evento):
     """Evento cuando el jugador colisiona con un enemigo"""
     def __init__(self, posicion_jugador, posicion_enemigo):
-        self.posicion_jugador = posicion_jugador  # (x, y) en celdas
-        self.posicion_enemigo = posicion_enemigo  # (x, y) en celdas
+        self.posicion_jugador = posicion_jugador
+        self.posicion_enemigo = posicion_enemigo
+
+class EventoSeleccionMenu(Evento):
+    """Evento cuando el usuario selecciona una opción del menú"""
+    def __init__(self, opcion):
+        self.opcion = opcion  # "JUEGO", "SALON_FAMA", "ADMINISTRACION", "SALIR"
 
 class AdministradorDeEventos:
     """Gestor central de eventos del juego"""
