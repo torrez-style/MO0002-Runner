@@ -1,5 +1,6 @@
 """Módulo de gestión de eventos para el juego"""
 
+
 class Evento:
     """Clase base para todos los eventos"""
     pass
@@ -27,7 +28,12 @@ class EventoColisionEnemigo(Evento):
 class EventoSeleccionMenu(Evento):
     """Evento cuando el usuario selecciona una opción del menú"""
     def __init__(self, opcion):
-        self.opcion = opcion  # "JUEGO", "SALON_FAMA", "ADMINISTRACION", "SALIR"
+        self.opcion = opcion
+
+class EventoGameOver(Evento):
+    """Evento cuando el jugador pierde todas sus vidas"""
+    def __init__(self, puntuacion_final):
+        self.puntuacion_final = puntuacion_final
 
 class AdministradorDeEventos:
     """Gestor central de eventos del juego"""
