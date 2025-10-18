@@ -1,5 +1,3 @@
-# main.py
-
 import pygame
 import random
 from evento import (
@@ -15,7 +13,6 @@ from vista import Vista
 from menu import MenuPrincipal
 from pathfinding import bfs_siguiente_paso, distancia_manhattan
 
-# --- Configuración ---
 ANCHO, ALTO = 600, 600
 TAM_CELDA = 40
 
@@ -37,16 +34,20 @@ def generar_posiciones_validas(laberinto, cantidad, excluir):
         intentos += 1
     return posiciones
 
+def jugador_celda_libre():
+    libres = [(x, y) for y in range(1, len(LABERINTO)-1) for x in range(1, len(LABERINTO[0])-1)
+              if LABERINTO[y][x] == 0 and (x, y) not in enemigos]
+    if libres:
+        return random.choice(libres)
+    return 1, 1
+
 def reiniciar_juego():
     global pos_x, pos_y, estrellas, enemigos, puntuacion, vidas, contador_frames
     pos_x, pos_y = 1, 1
     estrellas = generar_posiciones_validas(LABERINTO, 3, [(pos_x, pos_y)])
     enemigos = generar_posiciones_validas(LABERINTO, 2, [(pos_x, pos_y)] + estrellas)
-    puntuacion = 0
-    vidas = 3
-    contador_frames = 0
+    puntuacion, vidas, contador_frames = 0, 3, 0
 
-# Variables globales
 pos_x, pos_y = 1, 1
 estrellas, enemigos = [], []
 puntuacion, vidas, contador_frames = 0, 3, 0
@@ -124,15 +125,12 @@ class ManejadorColisiones:
     def __init__(self, mgr):
         self.mgr = mgr
         mgr.registrar(EventoColisionEnemigo, self)
-        self.last = -100
     def notificar(self, e):
-        global vidas, pos_x, pos_y, puntuacion_final
+        global vidas, pos_x, pos_y, puntuacion_final, enemigos
         if isinstance(e, EventoColisionEnemigo):
-            if contador_frames - self.last < 30: return
-            self.last = contador_frames
             vidas -= 1
             if vidas > 0:
-                pos_x, pos_y = 1, 1
+                pos_x, pos_y = jugador_celda_libre()
             else:
                 puntuacion_final = puntuacion
                 self.mgr.publicar(EventoGameOver(puntuacion_final))
@@ -142,7 +140,8 @@ class ManejadorMenu:
     def notificar(self, e):
         global estado
         if isinstance(e, EventoSeleccionMenu):
-            if e.opcion == "JUEGO": reiniciar_juego()
+            if e.opcion == "JUEGO":
+                reiniciar_juego()
             estado = e.opcion
 
 class ManejadorGameOver:
@@ -189,13 +188,10 @@ while True:
     if estado == "MENU":
         menu.dibujar()
         vista.actualizar()
-
     elif estado == "JUEGO":
         if vidas > 0 and (pos_x, pos_y) in estrellas:
             evento_mgr.publicar(EventoRecogerEstrella((pos_x, pos_y)))
-
         controlador_enemigos.actualizar()
-
         vista.limpiar_pantalla((0, 0, 0))
         vista.dibujar_laberinto(LABERINTO, TAM_CELDA)
         for ex, ey in enemigos:
@@ -205,7 +201,6 @@ while True:
         vista.dibujar_jugador(pos_x * TAM_CELDA, pos_y * TAM_CELDA, TAM_CELDA)
         vista.dibujar_hud(vidas, puntuacion)
         vista.actualizar()
-
     elif estado == "GAME_OVER":
         vista.limpiar_pantalla((50, 0, 0))
         vista.dibujar_texto("GAME OVER", 180, 200, 64, (255, 0, 0))
@@ -213,18 +208,14 @@ while True:
         vista.dibujar_texto("ENTER para reintentar", 100, 350, 28, (200, 200, 200))
         vista.dibujar_texto("ESC para menú", 90, 390, 28, (200, 200, 200))
         vista.actualizar()
-
     elif estado == "SALON_FAMA":
         vista.limpiar_pantalla((0, 0, 50))
         vista.dibujar_texto("Salón de la Fama", 150, 250, 48, (255, 255, 0))
         vista.dibujar_texto("ESC para volver", 120, 350, 32)
         vista.actualizar()
-
     elif estado == "ADMINISTRACION":
         vista.limpiar_pantalla((50, 0, 0))
         vista.dibujar_texto("Administración", 180, 250, 48, (255, 255, 0))
         vista.dibujar_texto("ESC para volver", 120, 350, 32)
         vista.actualizar()
-
     reloj.tick(60)
-
