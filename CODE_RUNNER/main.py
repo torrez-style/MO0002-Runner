@@ -14,22 +14,20 @@ from pathfinding import bfs_siguiente_paso, distancia_manhattan
 # CONFIGURACIÓN
 ANCHO, ALTO = 900, 700
 FPS = 50
-RANGO = 999  # alcance de detección amplio en mapas grandes
+RANGO = 999
 DURACION_POWERUP = 300
 ARCHIVO_PUNTUACIONES = "puntuaciones.json"
 ARCHIVO_PERFILES = "perfiles.json"
 ARCHIVO_CONFIG = "config.json"
 ARCHIVO_NIVELES = "niveles.json"
 
-# Carga niveles
 with open(ARCHIVO_NIVELES, "r", encoding="utf-8") as f:
     datos_niveles = json.load(f)
 NIVELES = datos_niveles["niveles"]
 
-# Estado
 nivel_actual = 0
 LABERINTO = NIVELES[0]["laberinto"]
-FRAME_ENE = max(12, NIVELES[0]["vel_enemigos"])  # mínimo para que no sea tan rápido
+FRAME_ENE = max(12, NIVELES[0]["vel_enemigos"])
 TAM_CELDA = 40
 pos_x, pos_y = 1, 1
 estrellas, enemigos, powerups = [], [], []
@@ -41,12 +39,10 @@ perfil_actual = ""
 mensaje_error = ""
 tiempo_mensaje = 0
 
-# Movimiento suave por pasos (tecla sostenida)
 PLAYER_STEP_DELAY = 7
 player_step_timer = 0
 held_dirs = set()
 
-# I/O
 
 def cargar_json(path, default=None):
     if not os.path.exists(path):
@@ -58,7 +54,6 @@ def cargar_json(path, default=None):
     except json.JSONDecodeError:
         return default if default is not None else []
 
-# Tablero dinámico
 
 def configurar_tablero(vista, laberinto):
     global TAM_CELDA
@@ -70,7 +65,6 @@ def configurar_tablero(vista, laberinto):
     vista.offset_x = (vista.ancho - tablero_w) // 2
     vista.offset_y = (vista.alto - tablero_h) // 2 + 20
 
-# Posiciones
 
 def generar_posiciones_validas(lab, c, ex):
     pos = []
@@ -83,6 +77,7 @@ def generar_posiciones_validas(lab, c, ex):
         i += 1
     return pos
 
+
 def jugador_celda_libre():
     libres = [
         (x, y)
@@ -91,6 +86,7 @@ def jugador_celda_libre():
         if LABERINTO[y][x] == 0 and (x, y) not in enemigos
     ]
     return random.choice(libres) if libres else (1, 1)
+
 
 def reiniciar_juego():
     global pos_x, pos_y, estrellas, enemigos, powerups, vidas, puntuacion, contador_frames, powerup_activo, powerup_timer
@@ -102,6 +98,7 @@ def reiniciar_juego():
     powerups = generar_posiciones_validas(LAB, lvl.get("powerups", 2), [(1, 1)] + estrellas + enemigos)
     vidas, puntuacion, contador_frames = 3, 0, 0
     powerup_activo, powerup_timer = None, 0
+
 
 def avanzar_nivel():
     global nivel_actual, LABERINTO, FRAME_ENE
@@ -115,14 +112,13 @@ def avanzar_nivel():
     else:
         estado_cambiar_a_game_over()
 
-# helpers de estado
 
 def estado_cambiar_a_game_over():
     global estado, puntuacion_final
     puntuacion_final = puntuacion
     estado = "GAME_OVER"
 
-# Pygame
+
 pygame.init()
 reloj = pygame.time.Clock()
 vista = Vista(ANCHO, ALTO, f"Maze-Run - Nivel {nivel_actual+1}")
@@ -130,7 +126,7 @@ evento_mgr = AdministradorDeEventos()
 menu = MenuPrincipal(vista, evento_mgr)
 configurar_tablero(vista, LABERINTO)
 
-# Controladores
+
 class ControladorJugador:
     def __init__(self, mgr): mgr.registrar(EventoMoverJugador, self)
     def notificar(self, e):
@@ -145,12 +141,14 @@ class ControladorJugador:
             if 0 <= ny < len(LABERINTO) and 0 <= nx < len(LABERINTO[0]) and LABERINTO[ny][nx] == 0:
                 pos_x, pos_y = nx, ny
 
+
 class ManejadorPowerUps:
     def __init__(self, mgr): mgr.registrar(EventoPowerUpAgarrado, self)
     def notificar(self, e):
         global powerup_activo, powerup_timer
         powerup_activo = e.tipo
         powerup_timer = DURACION_POWERUP
+
 
 class ControladorEnemigos:
     def __init__(self, mgr): self.mgr = mgr
@@ -164,7 +162,6 @@ class ControladorEnemigos:
         nuevos, ocup = [], set()
         for ex, ey in enemigos:
             paso = None
-            # detección sin límite de rango (RANGO grande asegura búsqueda)
             if powerup_activo != 'invisible':
                 p = bfs_siguiente_paso(LABERINTO, (ex,ey), (pos_x,pos_y))
                 if p and p not in ocup: paso = p
@@ -179,6 +176,7 @@ class ControladorEnemigos:
             ocup.add((ex,ey)); nuevos.append((ex,ey))
         enemigos = nuevos
 
+
 class ManejadorColisiones:
     def __init__(self, mgr): mgr.registrar(EventoColisionEnemigo, self); self.mgr = mgr
     def notificar(self, e):
@@ -188,6 +186,7 @@ class ManejadorColisiones:
             pos_x, pos_y = jugador_celda_libre()
         else:
             estado_cambiar_a_game_over()
+
 
 class ManejadorEstrellas:
     def __init__(self, mgr): mgr.registrar(EventoRecogerEstrella, self)
@@ -200,6 +199,7 @@ class ManejadorEstrellas:
                 avanzar_nivel()
                 vista.titulo = f"Maze-Run - Nivel {nivel_actual+1}"
 
+
 class ManejadorMenu:
     def __init__(self, mgr): mgr.registrar(EventoSeleccionMenu, self)
     def notificar(self, e):
@@ -211,6 +211,7 @@ class ManejadorMenu:
         else:
             estado = e.opcion
 
+
 ControladorJugador(evento_mgr)
 ManejadorPowerUps(evento_mgr)
 controlador_enemigos = ControladorEnemigos(evento_mgr)
@@ -218,7 +219,7 @@ ManejadorColisiones(evento_mgr)
 ManejadorEstrellas(evento_mgr)
 ManejadorMenu(evento_mgr)
 
-# Bucle principal
+
 while True:
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
@@ -240,6 +241,13 @@ while True:
                 elif ev.key == pygame.K_DOWN:  held_dirs.discard('abajo')
                 elif ev.key == pygame.K_LEFT:  held_dirs.discard('izquierda')
                 elif ev.key == pygame.K_RIGHT: held_dirs.discard('derecha')
+
+        elif estado == "GAME_OVER":
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_ESCAPE:
+                    estado = "MENU"
+                elif ev.key == pygame.K_RETURN:
+                    reiniciar_juego(); estado = "JUEGO"
 
     if estado == "JUEGO":
         if held_dirs:
