@@ -1,5 +1,3 @@
-
-
 import pygame
 from evento import EventoSeleccionMenu
 
@@ -7,7 +5,7 @@ class MenuPrincipal:
     def __init__(self, vista, evento_mgr):
         self.vista = vista
         self.evento_mgr = evento_mgr
-        self.opciones = ["JUEGO", "SALON_FAMA", "ADMINISTRACION", "SALIR"]
+        self.opciones = ["JUEGO", "SALÓN_DE_LA_FAMA", "ADMINISTRACION", "SALIR"]
         self.indice = 0
         self.fuente_titulo = pygame.font.SysFont(None, 48)
         self.fuente_opcion = pygame.font.SysFont(None, 36)
