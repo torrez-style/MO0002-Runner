@@ -300,6 +300,9 @@ class ManejadorMenu:
                 else:
                     reiniciar_juego()
                     estado = "JUEGO"
+            elif e.opcion == "SALIR":
+                pygame.quit()
+                exit()
             else:
                 estado = e.opcion
 
@@ -344,7 +347,7 @@ while True:
             elif ev.key == pygame.K_ESCAPE:
                 estado = "MENU"
 
-        elif estado == "SALON_FAMA" and ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+        elif estado == "SALÓN_DE_LA_FAMA" and ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
             estado = "MENU"
 
         elif estado == "ADMINISTRACION" and ev.type == pygame.KEYDOWN:
@@ -403,7 +406,7 @@ while True:
         vista.dibujar_texto("ESC menu", 90, 390, 28, (200,200,200))
         vista.actualizar()
     
-    elif estado == "SALON_FAMA":
+    elif estado == "SALÓN_DE_LA_FAMA":
         vista.limpiar_pantalla((0,0,50))
         vista.dibujar_texto("Salón de la Fama", 150, 250, 48, (255,255,0))
         puntuaciones = cargar_puntuaciones()
