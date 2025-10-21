@@ -9,7 +9,7 @@
         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
       ],
-      "vel_enemigos": 10,
+      "vel_enemigos": 18,
       "estrellas": 3,
       "enemigos": 2,
       "powerups": 2,
@@ -24,7 +24,7 @@
         [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
       ],
-      "vel_enemigos": 8,
+      "vel_enemigos": 16,
       "estrellas": 4,
       "enemigos": 3,
       "powerups": 2,
@@ -39,7 +39,7 @@
         [1,0,1,0,0,0,0,0,1,0,0,0,1,0,1],
         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
       ],
-      "vel_enemigos": 7,
+      "vel_enemigos": 14,
       "estrellas": 4,
       "enemigos": 3,
       "powerups": 2,
