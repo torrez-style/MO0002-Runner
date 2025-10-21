@@ -12,8 +12,8 @@ from menu import MenuPrincipal
 from pathfinding import bfs_siguiente_paso, distancia_manhattan
 
 # CONFIGURACIÓN
-ANCHO, ALTO = 600, 600
-TAM_CELDA = 40
+ANCHO, ALTO = 900, 700
+FPS = 50  # FPS más bajos para depuración cómoda
 RANGO = 10
 DURACION_POWERUP = 300
 ARCHIVO_PUNTUACIONES = "puntuaciones.json"
@@ -30,6 +30,7 @@ NIVELES = datos_niveles["niveles"]
 nivel_actual = 0
 LABERINTO = NIVELES[0]["laberinto"]
 FRAME_ENE = NIVELES[0]["vel_enemigos"]
+TAM_CELDA = 40  # se recalcula dinámicamente más abajo
 pos_x, pos_y = 1, 1
 estrellas, enemigos, powerups = [], [], []
 vidas, puntuacion, contador_frames, powerup_timer = 3, 0, 0, 0
@@ -39,6 +40,10 @@ estado = "MENU"
 perfil_actual = ""
 mensaje_error = ""
 tiempo_mensaje = 0
+
+# Control de ritmo de jugador
+PLAYER_COOLDOWN = 5
+player_cool = 0
 
 # Utilidades I/O
 
@@ -61,6 +66,18 @@ def cargar_perfiles():
 
 def cargar_puntuaciones():
     return cargar_json(ARCHIVO_PUNTUACIONES, [])
+
+# Layout dinámico del tablero
+
+def configurar_tablero(vista, laberinto):
+    global TAM_CELDA
+    filas, cols = len(laberinto), len(laberinto[0])
+    area_w, area_h = 640, 480  # área jugable dentro de la ventana
+    TAM_CELDA = max(16, min(area_w // cols, area_h // filas))
+    tablero_w = TAM_CELDA * cols
+    tablero_h = TAM_CELDA * filas
+    vista.offset_x = (vista.ancho - tablero_w) // 2
+    vista.offset_y = (vista.alto - tablero_h) // 2 + 20
 
 # Generación de posiciones
 
@@ -102,11 +119,10 @@ def avanzar_nivel():
         lvl = NIVELES[nivel_actual]
         LABERINTO = lvl["laberinto"]
         FRAME_ENE = lvl["vel_enemigos"]
+        configurar_tablero(vista, LABERINTO)
         reiniciar_juego()
     else:
         evento_mgr.publicar(EventoGameOver(puntuacion))
-
-reiniciar_juego()
 
 # Inicialización Pygame
 pygame.init()
@@ -114,6 +130,7 @@ reloj = pygame.time.Clock()
 vista = Vista(ANCHO, ALTO, f"Maze-Run - Nivel {nivel_actual+1}")
 evento_mgr = AdministradorDeEventos()
 menu = MenuPrincipal(vista, evento_mgr)
+configurar_tablero(vista, LABERINTO)
 
 # Controladores y manejadores
 
@@ -144,14 +161,14 @@ class ControladorEnemigos:
         global enemigos, contador_frames
         if vidas <= 0: return
         contador_frames += 1
-        delay = FRAME_ENE
+        delay = max(8, FRAME_ENE)  # mínimo de demora
         if contador_frames < delay: return
         contador_frames = 0
         nuevos, ocup = [], set()
         for ex, ey in enemigos:
             dist = distancia_manhattan((ex,ey), (pos_x,pos_y))
             paso = None
-            if dist <= RANGO:
+            if dist <= RANGO and powerup_activo != 'invisible':
                 p = bfs_siguiente_paso(LABERINTO, (ex,ey), (pos_x,pos_y))
                 if p and p not in ocup: paso = p
             if not paso:
@@ -160,7 +177,7 @@ class ControladorEnemigos:
                     if 0 <= ny < len(LABERINTO) and 0 <= nx < len(LABERINTO[0]) and LABERINTO[ny][nx] == 0 and (nx,ny) not in ocup:
                         paso = (nx,ny); break
             ex, ey = paso or (ex,ey)
-            if (ex,ey) == (pos_x,pos_y):
+            if (ex,ey) == (pos_x,pos_y) and powerup_activo != 'invulnerable':
                 self.mgr.publicar(EventoColisionEnemigo((pos_x,pos_y),(ex,ey)))
             ocup.add((ex,ey)); nuevos.append((ex,ey))
         enemigos = nuevos
@@ -217,19 +234,22 @@ while True:
         if ev.type == pygame.QUIT:
             pygame.quit(); exit()
 
+        # Cooldown de entrada del jugador
+        if player_cool > 0:
+            player_cool -= 1
+
         if estado == "MENU":
             menu.manejar_eventos(ev)
         elif estado == "JUEGO" and ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_ESCAPE:
                 estado = "MENU"
-            elif ev.key == pygame.K_UP:
-                evento_mgr.publicar(EventoMoverJugador('arriba'))
-            elif ev.key == pygame.K_DOWN:
-                evento_mgr.publicar(EventoMoverJugador('abajo'))
-            elif ev.key == pygame.K_LEFT:
-                evento_mgr.publicar(EventoMoverJugador('izquierda'))
-            elif ev.key == pygame.K_RIGHT:
-                evento_mgr.publicar(EventoMoverJugador('derecha'))
+            elif ev.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT):
+                if player_cool == 0:
+                    if ev.key == pygame.K_UP:   evento_mgr.publicar(EventoMoverJugador('arriba'))
+                    if ev.key == pygame.K_DOWN: evento_mgr.publicar(EventoMoverJugador('abajo'))
+                    if ev.key == pygame.K_LEFT: evento_mgr.publicar(EventoMoverJugador('izquierda'))
+                    if ev.key == pygame.K_RIGHT:evento_mgr.publicar(EventoMoverJugador('derecha'))
+                    player_cool = PLAYER_COOLDOWN
         elif estado == "GAME_OVER" and ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_RETURN:
                 reiniciar_juego(); estado = "JUEGO"
@@ -251,15 +271,10 @@ while True:
             powerups.remove((pos_x,pos_y)); evento_mgr.publicar(EventoPowerUpAgarrado('congelar'))
         controlador_enemigos.actualizar()
         vista.limpiar_pantalla((0,0,0))
-        # Colores por nivel si existen
         lvl = NIVELES[nivel_actual]
         col_pared = tuple(lvl.get("colores", {}).get("pared", (80,80,80)))
         col_suelo = tuple(lvl.get("colores", {}).get("suelo", (220,220,220)))
-        # Asegurar firma de vista
-        if hasattr(vista, 'dibujar_laberinto') and vista.dibujar_laberinto.__code__.co_argcount >= 5:
-            vista.dibujar_laberinto(LABERINTO, TAM_CELDA, col_pared, col_suelo)
-        else:
-            vista.dibujar_laberinto(LABERINTO, TAM_CELDA)
+        vista.dibujar_laberinto(LABERINTO, TAM_CELDA, col_pared, col_suelo)
         for ex,ey in enemigos: vista.dibujar_enemigo(ex*TAM_CELDA, ey*TAM_CELDA, TAM_CELDA)
         for sx,sy in estrellas: vista.dibujar_estrella(sx*TAM_CELDA, sy*TAM_CELDA, TAM_CELDA)
         for px,py in powerups: vista.dibujar_powerup(px*TAM_CELDA, py*TAM_CELDA, TAM_CELDA)
@@ -291,4 +306,4 @@ while True:
             vista.dibujar_texto(mensaje_error, 50, 300, 24, (255,100,100))
         vista.actualizar()
 
-    reloj.tick(60)
+    reloj.tick(FPS)
