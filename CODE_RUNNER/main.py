@@ -13,7 +13,7 @@ from pathfinding import bfs_siguiente_paso, distancia_manhattan
 
 # CONFIGURACIÓN
 ANCHO, ALTO = 900, 700
-FPS = 50  # FPS más bajos para depuración cómoda
+FPS = 50
 RANGO = 10
 DURACION_POWERUP = 300
 ARCHIVO_PUNTUACIONES = "puntuaciones.json"
@@ -21,16 +21,16 @@ ARCHIVO_PERFILES = "perfiles.json"
 ARCHIVO_CONFIG = "config.json"
 ARCHIVO_NIVELES = "niveles.json"
 
-# Carga niveles desde JSON
+# Carga niveles
 with open(ARCHIVO_NIVELES, "r", encoding="utf-8") as f:
     datos_niveles = json.load(f)
 NIVELES = datos_niveles["niveles"]
 
-# Estado global
+# Estado
 nivel_actual = 0
 LABERINTO = NIVELES[0]["laberinto"]
-FRAME_ENE = NIVELES[0]["vel_enemigos"]
-TAM_CELDA = 40  # se recalcula dinámicamente más abajo
+FRAME_ENE = max(12, NIVELES[0]["vel_enemigos"])  # mínimo para que no sea tan rápido
+TAM_CELDA = 40
 pos_x, pos_y = 1, 1
 estrellas, enemigos, powerups = [], [], []
 vidas, puntuacion, contador_frames, powerup_timer = 3, 0, 0, 0
@@ -41,11 +41,13 @@ perfil_actual = ""
 mensaje_error = ""
 tiempo_mensaje = 0
 
-# Control de ritmo de jugador
-PLAYER_COOLDOWN = 5
-player_cool = 0
+# Movimiento suave por pasos (tecla sostenida)
+PLAYER_STEP_DELAY = 7   # frames entre pasos cuando está sostenida
+PLAYER_TAP_DELAY = 2    # delay tras un toque
+player_step_timer = 0
+held_dirs = set()
 
-# Utilidades I/O
+# I/O
 
 def cargar_json(path, default=None):
     if not os.path.exists(path):
@@ -57,29 +59,19 @@ def cargar_json(path, default=None):
     except json.JSONDecodeError:
         return default if default is not None else []
 
-def guardar_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-def cargar_perfiles():
-    return cargar_json(ARCHIVO_PERFILES, [])
-
-def cargar_puntuaciones():
-    return cargar_json(ARCHIVO_PUNTUACIONES, [])
-
-# Layout dinámico del tablero
+# Tablero dinámico
 
 def configurar_tablero(vista, laberinto):
     global TAM_CELDA
     filas, cols = len(laberinto), len(laberinto[0])
-    area_w, area_h = 640, 480  # área jugable dentro de la ventana
-    TAM_CELDA = max(16, min(area_w // cols, area_h // filas))
+    area_w, area_h = 640, 480
+    TAM_CELDA = max(20, min(area_w // cols, area_h // filas))
     tablero_w = TAM_CELDA * cols
     tablero_h = TAM_CELDA * filas
     vista.offset_x = (vista.ancho - tablero_w) // 2
     vista.offset_y = (vista.alto - tablero_h) // 2 + 20
 
-# Generación de posiciones
+# Posiciones
 
 def generar_posiciones_validas(lab, c, ex):
     pos = []
@@ -106,9 +98,9 @@ def reiniciar_juego():
     lvl = NIVELES[nivel_actual]
     LAB = lvl["laberinto"]
     pos_x, pos_y = 1, 1
-    estrellas = generar_posiciones_validas(LAB, lvl["estrellas"], [(1, 1)])
-    enemigos = generar_posiciones_validas(LAB, lvl["enemigos"], [(1, 1)] + estrellas)
-    powerups = generar_posiciones_validas(LAB, lvl["powerups"], [(1, 1)] + estrellas + enemigos)
+    estrellas = generar_posiciones_validas(LAB, lvl.get("estrellas", 3), [(1, 1)])
+    enemigos = generar_posiciones_validas(LAB, lvl.get("enemigos", 2), [(1, 1)] + estrellas)
+    powerups = generar_posiciones_validas(LAB, lvl.get("powerups", 2), [(1, 1)] + estrellas + enemigos)
     vidas, puntuacion, contador_frames = 3, 0, 0
     powerup_activo, powerup_timer = None, 0
 
@@ -118,27 +110,29 @@ def avanzar_nivel():
         nivel_actual += 1
         lvl = NIVELES[nivel_actual]
         LABERINTO = lvl["laberinto"]
-        FRAME_ENE = lvl["vel_enemigos"]
+        FRAME_ENE = max(10, lvl.get("vel_enemigos", 12))
         configurar_tablero(vista, LABERINTO)
         reiniciar_juego()
     else:
         evento_mgr.publicar(EventoGameOver(puntuacion))
 
-# Inicialización Pygame
+# Pygame
 pygame.init()
 reloj = pygame.time.Clock()
 vista = Vista(ANCHO, ALTO, f"Maze-Run - Nivel {nivel_actual+1}")
+from evento import AdministradorDeEventos
 evento_mgr = AdministradorDeEventos()
 menu = MenuPrincipal(vista, evento_mgr)
 configurar_tablero(vista, LABERINTO)
 
-# Controladores y manejadores
-
+# Controladores
 class ControladorJugador:
     def __init__(self, mgr): mgr.registrar(EventoMoverJugador, self)
     def notificar(self, e):
         global pos_x, pos_y
-        if isinstance(e, EventoMoverJugador) and vidas > 0:
+        if LABERINTO[pos_y][pos_x] == 1:  # seguridad
+            return
+        if isinstance(e, EventoMoverJugador):
             dx = dy = 0
             if e.direccion == 'arriba': dy = -1
             elif e.direccion == 'abajo': dy = 1
@@ -161,14 +155,14 @@ class ControladorEnemigos:
         global enemigos, contador_frames
         if vidas <= 0: return
         contador_frames += 1
-        delay = max(8, FRAME_ENE)  # mínimo de demora
+        # ritmo más lento y estable
+        delay = max(14, FRAME_ENE)  # mínimo 14 frames por paso
         if contador_frames < delay: return
         contador_frames = 0
         nuevos, ocup = [], set()
         for ex, ey in enemigos:
-            dist = distancia_manhattan((ex,ey), (pos_x,pos_y))
             paso = None
-            if dist <= RANGO and powerup_activo != 'invisible':
+            if distancia_manhattan((ex,ey), (pos_x,pos_y)) <= RANGO and powerup_activo != 'invisible':
                 p = bfs_siguiente_paso(LABERINTO, (ex,ey), (pos_x,pos_y))
                 if p and p not in ocup: paso = p
             if not paso:
@@ -215,7 +209,6 @@ class ManejadorMenu:
         else:
             estado = e.opcion
 
-# Registrar manejadores
 ControladorJugador(evento_mgr)
 ManejadorPowerUps(evento_mgr)
 controlador_enemigos = ControladorEnemigos(evento_mgr)
@@ -225,51 +218,56 @@ ManejadorMenu(evento_mgr)
 
 # Bucle principal
 while True:
-    if tiempo_mensaje > 0:
-        tiempo_mensaje -= 1
-        if tiempo_mensaje <= 0:
-            mensaje_error = ""
-
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
             pygame.quit(); exit()
 
-        # Cooldown de entrada del jugador
-        if player_cool > 0:
-            player_cool -= 1
-
         if estado == "MENU":
             menu.manejar_eventos(ev)
-        elif estado == "JUEGO" and ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_ESCAPE:
-                estado = "MENU"
-            elif ev.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT):
-                if player_cool == 0:
-                    if ev.key == pygame.K_UP:   evento_mgr.publicar(EventoMoverJugador('arriba'))
-                    if ev.key == pygame.K_DOWN: evento_mgr.publicar(EventoMoverJugador('abajo'))
-                    if ev.key == pygame.K_LEFT: evento_mgr.publicar(EventoMoverJugador('izquierda'))
-                    if ev.key == pygame.K_RIGHT:evento_mgr.publicar(EventoMoverJugador('derecha'))
-                    player_cool = PLAYER_COOLDOWN
+
+        elif estado == "JUEGO":
+            # lectura de teclas sostenidas y por toque
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_ESCAPE:
+                    estado = "MENU"
+                elif ev.key == pygame.K_UP:    held_dirs.add('arriba');  player_step_timer = 0
+                elif ev.key == pygame.K_DOWN:  held_dirs.add('abajo');   player_step_timer = 0
+                elif ev.key == pygame.K_LEFT:  held_dirs.add('izquierda'); player_step_timer = 0
+                elif ev.key == pygame.K_RIGHT: held_dirs.add('derecha'); player_step_timer = 0
+            elif ev.type == pygame.KEYUP:
+                if ev.key == pygame.K_UP:    held_dirs.discard('arriba')
+                elif ev.key == pygame.K_DOWN:  held_dirs.discard('abajo')
+                elif ev.key == pygame.K_LEFT:  held_dirs.discard('izquierda')
+                elif ev.key == pygame.K_RIGHT: held_dirs.discard('derecha')
+
         elif estado == "GAME_OVER" and ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_RETURN:
-                reiniciar_juego(); estado = "JUEGO"
-            elif ev.key == pygame.K_ESCAPE:
-                estado = "MENU"
+            if ev.key == pygame.K_RETURN: reiniciar_juego(); estado = "JUEGO"
+            elif ev.key == pygame.K_ESCAPE: estado = "MENU"
         elif estado == "SALÓN_DE_LA_FAMA" and ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
             estado = "MENU"
         elif estado == "ADMINISTRACION" and ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_ESCAPE:
-                estado = "MENU"
+            if ev.key == pygame.K_ESCAPE: estado = "MENU"
 
-    # Render según estado
-    if estado == "MENU":
-        menu.dibujar(); vista.actualizar()
-    elif estado == "JUEGO":
+    # Movimiento por tecla sostenida (una celda cada N frames)
+    if estado == "JUEGO":
+        if held_dirs:
+            player_step_timer -= 1
+            if player_step_timer <= 0:
+                # prioridad vertical > horizontal para control estable
+                if 'arriba' in held_dirs:   evento_mgr.publicar(EventoMoverJugador('arriba'))
+                elif 'abajo' in held_dirs:  evento_mgr.publicar(EventoMoverJugador('abajo'))
+                elif 'izquierda' in held_dirs: evento_mgr.publicar(EventoMoverJugador('izquierda'))
+                elif 'derecha' in held_dirs:   evento_mgr.publicar(EventoMoverJugador('derecha'))
+                player_step_timer = PLAYER_STEP_DELAY
+
+        # lógica de powerups y enemigos
         if vidas > 0 and (pos_x,pos_y) in estrellas:
             evento_mgr.publicar(EventoRecogerEstrella((pos_x,pos_y)))
         if vidas > 0 and (pos_x,pos_y) in powerups:
             powerups.remove((pos_x,pos_y)); evento_mgr.publicar(EventoPowerUpAgarrado('congelar'))
         controlador_enemigos.actualizar()
+
+        # Render
         vista.limpiar_pantalla((0,0,0))
         lvl = NIVELES[nivel_actual]
         col_pared = tuple(lvl.get("colores", {}).get("pared", (80,80,80)))
@@ -281,6 +279,9 @@ while True:
         vista.dibujar_jugador(pos_x*TAM_CELDA, pos_y*TAM_CELDA, TAM_CELDA)
         vista.dibujar_hud(vidas, puntuacion)
         vista.actualizar()
+
+    elif estado == "MENU":
+        menu.dibujar(); vista.actualizar()
     elif estado == "GAME_OVER":
         vista.limpiar_pantalla((50,0,0))
         vista.dibujar_texto("GAME OVER", 180,200,64,(255,0,0))
@@ -292,7 +293,7 @@ while True:
         vista.limpiar_pantalla((0,0,50))
         vista.dibujar_texto("Salón de la Fama", 150, 250, 48, (255,255,0))
         y_pos = 320
-        for i, entrada in enumerate(cargar_puntuaciones()[:10]):
+        for i, entrada in enumerate(cargar_json(ARCHIVO_PUNTUACIONES, [])[:10]):
             if isinstance(entrada, dict) and 'nombre' in entrada and 'puntuacion' in entrada:
                 vista.dibujar_texto(f"{i+1}. {entrada['nombre']}: {entrada['puntuacion']}", 120, y_pos, 24, (255,255,255))
                 y_pos += 30
