@@ -25,7 +25,7 @@
       "estrellas": 6,
       "enemigos": 4,
       "powerups": 3,
-      "colores": {"pared": [255,255,255], "suelo": [200,20,20], "enemigo": [40,40,220]}
+      "colores": {"pared": [255,255,255], "suelo": [180,40,40], "enemigo": [40,40,220]}
     }
   ]
 }
