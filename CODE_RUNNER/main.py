@@ -42,7 +42,7 @@ mensaje_error = ""
 tiempo_mensaje = 0
 
 # Movimiento suave por pasos (tecla sostenida)
-PLAYER_STEP_DELAY = 7   # frames entre pasos cuando está sostenida
+PLAYER_STEP_DELAY = 7
 player_step_timer = 0
 held_dirs = set()
 
@@ -234,14 +234,6 @@ while True:
                 elif ev.key == pygame.K_LEFT:  held_dirs.discard('izquierda')
                 elif ev.key == pygame.K_RIGHT: held_dirs.discard('derecha')
 
-        elif estado == "GAME_OVER" and ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_RETURN: reiniciar_juego(); estado = "JUEGO"
-            elif ev.key == pygame.K_ESCAPE: estado = "MENU"
-        elif estado == "SALÓN_DE_LA_FAMA" and ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-            estado = "MENU"
-        elif estado == "ADMINISTRACION" and ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_ESCAPE: estado = "MENU"
-
     # Movimiento continuo
     if estado == "JUEGO":
         if held_dirs:
@@ -253,6 +245,7 @@ while True:
                 elif 'derecha' in held_dirs:   evento_mgr.publicar(EventoMoverJugador('derecha'))
                 player_step_timer = PLAYER_STEP_DELAY
 
+        # lógica y render
         if vidas > 0 and (pos_x,pos_y) in estrellas:
             evento_mgr.publicar(EventoRecogerEstrella((pos_x,pos_y)))
         if vidas > 0 and (pos_x,pos_y) in powerups:
@@ -263,8 +256,9 @@ while True:
         lvl = NIVELES[nivel_actual]
         col_pared = tuple(lvl.get("colores", {}).get("pared", (80,80,80)))
         col_suelo = tuple(lvl.get("colores", {}).get("suelo", (220,220,220)))
+        col_enem = tuple(lvl.get("colores", {}).get("enemigo", (220,50,50)))
         vista.dibujar_laberinto(LABERINTO, TAM_CELDA, col_pared, col_suelo)
-        for ex,ey in enemigos: vista.dibujar_enemigo(ex*TAM_CELDA, ey*TAM_CELDA, TAM_CELDA)
+        for ex,ey in enemigos: vista.dibujar_enemigo(ex*TAM_CELDA, ey*TAM_CELDA, TAM_CELDA, color=col_enem)
         for sx,sy in estrellas: vista.dibujar_estrella(sx*TAM_CELDA, sy*TAM_CELDA, TAM_CELDA)
         for px,py in powerups: vista.dibujar_powerup(px*TAM_CELDA, py*TAM_CELDA, TAM_CELDA)
         vista.dibujar_jugador(pos_x*TAM_CELDA, pos_y*TAM_CELDA, TAM_CELDA)
@@ -273,29 +267,5 @@ while True:
 
     elif estado == "MENU":
         menu.dibujar(); vista.actualizar()
-    elif estado == "GAME_OVER":
-        vista.limpiar_pantalla((50,0,0))
-        vista.dibujar_texto("GAME OVER", 180,200,64,(255,0,0))
-        vista.dibujar_texto(f"Punt.Fin:{puntuacion_final}",150,280,36,(255,255,255))
-        vista.dibujar_texto("ENTER reint.",100,350,28,(200,200,200))
-        vista.dibujar_texto("ESC menu",90,390,28,(200,200,200))
-        vista.actualizar()
-    elif estado == "SALÓN_DE_LA_FAMA":
-        vista.limpiar_pantalla((0,0,50))
-        vista.dibujar_texto("Salón de la Fama", 150, 250, 48, (255,255,0))
-        y_pos = 320
-        for i, entrada in enumerate(cargar_json(ARCHIVO_PUNTUACIONES, [])[:10]):
-            if isinstance(entrada, dict) and 'nombre' in entrada and 'puntuacion' in entrada:
-                vista.dibujar_texto(f"{i+1}. {entrada['nombre']}: {entrada['puntuacion']}", 120, y_pos, 24, (255,255,255))
-                y_pos += 30
-        vista.dibujar_texto("ESC volver", 120, 550, 32, (200,200,200))
-        vista.actualizar()
-    elif estado == "ADMINISTRACION":
-        vista.limpiar_pantalla((50,0,0))
-        vista.dibujar_texto("Administración", 180, 250, 48, (255,255,0))
-        vista.dibujar_texto("ESC volver", 120, 350, 32, (200,200,200))
-        if mensaje_error:
-            vista.dibujar_texto(mensaje_error, 50, 300, 24, (255,100,100))
-        vista.actualizar()
 
     reloj.tick(FPS)
