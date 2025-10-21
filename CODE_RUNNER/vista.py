@@ -7,9 +7,8 @@ class Vista:
         self.ancho = ancho
         self.alto = alto
         self.fuente_hud = pygame.font.SysFont(None, 32)
-        # offsets para centrar el laberinto dentro de un marco
-        self.offset_x = 160  # margen izquierdo como en capturas
-        self.offset_y = 90   # margen superior
+        self.offset_x = 0
+        self.offset_y = 0
 
     def limpiar_pantalla(self, color):
         self.pantalla.fill(color)
@@ -31,8 +30,8 @@ class Vista:
     def dibujar_jugador(self, x, y, tam):
         pygame.draw.circle(self.pantalla, (100, 0, 255), (self.offset_x + x + tam//2, self.offset_y + y + tam//2), tam//2)
 
-    def dibujar_enemigo(self, x, y, tam):
-        pygame.draw.circle(self.pantalla, (220, 50, 50), (self.offset_x + x + tam//2, self.offset_y + y + tam//2), tam//2)
+    def dibujar_enemigo(self, x, y, tam, color=(220, 50, 50)):
+        pygame.draw.circle(self.pantalla, color, (self.offset_x + x + tam//2, self.offset_y + y + tam//2), tam//2)
 
     def dibujar_estrella(self, x, y, tam):
         rect = pygame.Rect(self.offset_x + x + tam*0.25, self.offset_y + y + tam*0.25, tam*0.5, tam*0.5)
