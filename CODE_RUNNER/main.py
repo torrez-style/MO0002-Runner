@@ -14,7 +14,7 @@ from pathfinding import bfs_siguiente_paso, distancia_manhattan
 # CONFIGURACIÓN
 ANCHO, ALTO = 900, 700
 FPS = 50
-RANGO = 10
+RANGO = 999  # alcance de detección amplio en mapas grandes
 DURACION_POWERUP = 300
 ARCHIVO_PUNTUACIONES = "puntuaciones.json"
 ARCHIVO_PERFILES = "perfiles.json"
@@ -113,7 +113,14 @@ def avanzar_nivel():
         configurar_tablero(vista, LABERINTO)
         reiniciar_juego()
     else:
-        evento_mgr.publicar(EventoGameOver(puntuacion))
+        estado_cambiar_a_game_over()
+
+# helpers de estado
+
+def estado_cambiar_a_game_over():
+    global estado, puntuacion_final
+    puntuacion_final = puntuacion
+    estado = "GAME_OVER"
 
 # Pygame
 pygame.init()
@@ -157,7 +164,8 @@ class ControladorEnemigos:
         nuevos, ocup = [], set()
         for ex, ey in enemigos:
             paso = None
-            if distancia_manhattan((ex,ey), (pos_x,pos_y)) <= RANGO and powerup_activo != 'invisible':
+            # detección sin límite de rango (RANGO grande asegura búsqueda)
+            if powerup_activo != 'invisible':
                 p = bfs_siguiente_paso(LABERINTO, (ex,ey), (pos_x,pos_y))
                 if p and p not in ocup: paso = p
             if not paso:
@@ -174,13 +182,12 @@ class ControladorEnemigos:
 class ManejadorColisiones:
     def __init__(self, mgr): mgr.registrar(EventoColisionEnemigo, self); self.mgr = mgr
     def notificar(self, e):
-        global vidas, pos_x, pos_y, puntuacion_final, estado
+        global vidas, pos_x, pos_y
         vidas -= 1
         if vidas > 0:
             pos_x, pos_y = jugador_celda_libre()
         else:
-            puntuacion_final = puntuacion
-            estado = "GAME_OVER"
+            estado_cambiar_a_game_over()
 
 class ManejadorEstrellas:
     def __init__(self, mgr): mgr.registrar(EventoRecogerEstrella, self)
@@ -234,7 +241,6 @@ while True:
                 elif ev.key == pygame.K_LEFT:  held_dirs.discard('izquierda')
                 elif ev.key == pygame.K_RIGHT: held_dirs.discard('derecha')
 
-    # Movimiento continuo
     if estado == "JUEGO":
         if held_dirs:
             player_step_timer -= 1
@@ -245,7 +251,6 @@ while True:
                 elif 'derecha' in held_dirs:   evento_mgr.publicar(EventoMoverJugador('derecha'))
                 player_step_timer = PLAYER_STEP_DELAY
 
-        # lógica y render
         if vidas > 0 and (pos_x,pos_y) in estrellas:
             evento_mgr.publicar(EventoRecogerEstrella((pos_x,pos_y)))
         if vidas > 0 and (pos_x,pos_y) in powerups:
@@ -267,5 +272,11 @@ while True:
 
     elif estado == "MENU":
         menu.dibujar(); vista.actualizar()
+    elif estado == "GAME_OVER":
+        vista.limpiar_pantalla((30,0,0))
+        vista.dibujar_texto("GAME OVER", 220, 200, 72, (255,80,80))
+        vista.dibujar_texto(f"Puntaje final: {puntuacion_final}", 200, 280, 36, (255,255,255))
+        vista.dibujar_texto("ENTER: Reintentar    ESC: Menú", 160, 340, 28, (220,220,220))
+        vista.actualizar()
 
     reloj.tick(FPS)
