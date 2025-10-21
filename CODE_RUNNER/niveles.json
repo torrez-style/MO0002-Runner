@@ -1,6 +1,7 @@
 {
   "niveles": [
     {
+      "nombre": "LABERINTO 1",
       "laberinto": [
         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
@@ -11,9 +12,11 @@
       "vel_enemigos": 10,
       "estrellas": 3,
       "enemigos": 2,
-      "powerups": 2
+      "powerups": 2,
+      "colores": {"pared": [18,87,36], "suelo": [122,201,96]}
     },
     {
+      "nombre": "LABERINTO 2",
       "laberinto": [
         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
         [1,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
@@ -24,7 +27,23 @@
       "vel_enemigos": 8,
       "estrellas": 4,
       "enemigos": 3,
-      "powerups": 2
+      "powerups": 2,
+      "colores": {"pared": [70,70,70], "suelo": [200,220,245]}
+    },
+    {
+      "nombre": "LABERINTO 3",
+      "laberinto": [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+        [1,0,1,0,1,0,1,1,1,0,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,1,0,0,0,1,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ],
+      "vel_enemigos": 7,
+      "estrellas": 4,
+      "enemigos": 3,
+      "powerups": 2,
+      "colores": {"pared": [255,255,255], "suelo": [200,20,20]}
     }
   ]
 }
