@@ -22,7 +22,7 @@ ARCHIVO_CONFIG = "config.json"
 ARCHIVO_NIVELES = "niveles.json"
 
 # Carga niveles desde JSON
-with open(ARCHIVO_NIVELES, "r") as f:
+with open(ARCHIVO_NIVELES, "r", encoding="utf-8") as f:
     datos_niveles = json.load(f)
 NIVELES = datos_niveles["niveles"]
 
@@ -37,73 +37,33 @@ powerup_activo = None
 puntuacion_final = 0
 estado = "MENU"
 perfil_actual = ""
-nuevo_perfil = ""
-creando_perfil = False
-seleccionando_perfil = False
-indice_perfil = 0
-creando_contrasena = False
-autenticando = False
-modo_borrar = ""
-nueva_contrasena = ""
-contrasena_input = ""
 mensaje_error = ""
 tiempo_mensaje = 0
 
 # Utilidades I/O
-def cargar_json(path):
+
+def cargar_json(path, default=None):
     if not os.path.exists(path):
-        return []
+        return default if default is not None else []
     try:
-        with open(path, "r") as f:
-            return json.load(f)
+        with open(path, "r", encoding="utf-8") as f:
+            txt = f.read().strip()
+            return json.loads(txt) if txt else (default if default is not None else [])
     except json.JSONDecodeError:
-        return []
+        return default if default is not None else []
 
 def guardar_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 def cargar_perfiles():
-    return cargar_json(ARCHIVO_PERFILES)
+    return cargar_json(ARCHIVO_PERFILES, [])
 
 def cargar_puntuaciones():
-    return cargar_json(ARCHIVO_PUNTUACIONES)
-
-def cargar_config():
-    if not os.path.exists(ARCHIVO_CONFIG):
-        return {}
-    try:
-        with open(ARCHIVO_CONFIG, "r") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return {}
-
-def nombre_existe(n):
-    return n.upper() in [p.upper() for p in cargar_perfiles()]
-
-def guardar_perfil(n):
-    perf = cargar_perfiles()
-    if n.upper() in [p.upper() for p in perf]:
-        return False
-    perf.append(n)
-    guardar_json(ARCHIVO_PERFILES, perf)
-    return True
-
-def guardar_puntuacion(n, p):
-    pts = cargar_puntuaciones() + [{"nombre": n, "puntuacion": p}]
-    pts = sorted(pts, key=lambda x: x["puntuacion"], reverse=True)[:10]
-    guardar_json(ARCHIVO_PUNTUACIONES, pts)
-
-def guardar_config(cfg):
-    guardar_json(ARCHIVO_CONFIG, cfg)
-
-def borrar_salon():
-    open(ARCHIVO_PUNTUACIONES, "w").close()
-
-def borrar_perfiles():
-    open(ARCHIVO_PERFILES, "w").close()
+    return cargar_json(ARCHIVO_PUNTUACIONES, [])
 
 # Generación de posiciones
+
 def generar_posiciones_validas(lab, c, ex):
     pos = []
     filas, cols = len(lab), len(lab[0])
@@ -155,11 +115,99 @@ vista = Vista(ANCHO, ALTO, f"Maze-Run - Nivel {nivel_actual+1}")
 evento_mgr = AdministradorDeEventos()
 menu = MenuPrincipal(vista, evento_mgr)
 
-# Controladores (omito para brevedad; copiar de tu versión anterior)
-# ControladorJugador, ManejadorPowerUps, ControladorEnemigos, ManejadorColisiones, ManejadorEstrellas, ManejadorMenu
+# Controladores y manejadores
 
+class ControladorJugador:
+    def __init__(self, mgr): mgr.registrar(EventoMoverJugador, self)
+    def notificar(self, e):
+        global pos_x, pos_y
+        if isinstance(e, EventoMoverJugador) and vidas > 0:
+            dx = dy = 0
+            if e.direccion == 'arriba': dy = -1
+            elif e.direccion == 'abajo': dy = 1
+            elif e.direccion == 'izquierda': dx = -1
+            elif e.direccion == 'derecha': dx = 1
+            nx, ny = pos_x + dx, pos_y + dy
+            if 0 <= ny < len(LABERINTO) and 0 <= nx < len(LABERINTO[0]) and LABERINTO[ny][nx] == 0:
+                pos_x, pos_y = nx, ny
+
+class ManejadorPowerUps:
+    def __init__(self, mgr): mgr.registrar(EventoPowerUpAgarrado, self)
+    def notificar(self, e):
+        global powerup_activo, powerup_timer
+        powerup_activo = e.tipo
+        powerup_timer = DURACION_POWERUP
+
+class ControladorEnemigos:
+    def __init__(self, mgr): self.mgr = mgr
+    def actualizar(self):
+        global enemigos, contador_frames
+        if vidas <= 0: return
+        contador_frames += 1
+        delay = FRAME_ENE
+        if contador_frames < delay: return
+        contador_frames = 0
+        nuevos, ocup = [], set()
+        for ex, ey in enemigos:
+            dist = distancia_manhattan((ex,ey), (pos_x,pos_y))
+            paso = None
+            if dist <= RANGO:
+                p = bfs_siguiente_paso(LABERINTO, (ex,ey), (pos_x,pos_y))
+                if p and p not in ocup: paso = p
+            if not paso:
+                for dx, dy in [(0,1),(0,-1),(1,0),(-1,0)]:
+                    nx, ny = ex + dx, ey + dy
+                    if 0 <= ny < len(LABERINTO) and 0 <= nx < len(LABERINTO[0]) and LABERINTO[ny][nx] == 0 and (nx,ny) not in ocup:
+                        paso = (nx,ny); break
+            ex, ey = paso or (ex,ey)
+            if (ex,ey) == (pos_x,pos_y):
+                self.mgr.publicar(EventoColisionEnemigo((pos_x,pos_y),(ex,ey)))
+            ocup.add((ex,ey)); nuevos.append((ex,ey))
+        enemigos = nuevos
+
+class ManejadorColisiones:
+    def __init__(self, mgr): mgr.registrar(EventoColisionEnemigo, self); self.mgr = mgr
+    def notificar(self, e):
+        global vidas, pos_x, pos_y, puntuacion_final, estado
+        vidas -= 1
+        if vidas > 0:
+            pos_x, pos_y = jugador_celda_libre()
+        else:
+            puntuacion_final = puntuacion
+            estado = "GAME_OVER"
+
+class ManejadorEstrellas:
+    def __init__(self, mgr): mgr.registrar(EventoRecogerEstrella, self)
+    def notificar(self, e):
+        global estrellas, puntuacion
+        if isinstance(e, EventoRecogerEstrella) and e.posicion in estrellas:
+            estrellas.remove(e.posicion)
+            puntuacion += 10
+            if not estrellas:
+                avanzar_nivel()
+                vista.titulo = f"Maze-Run - Nivel {nivel_actual+1}"
+
+class ManejadorMenu:
+    def __init__(self, mgr): mgr.registrar(EventoSeleccionMenu, self)
+    def notificar(self, e):
+        global estado
+        if e.opcion == "JUEGO":
+            reiniciar_juego(); estado = "JUEGO"
+        elif e.opcion == "SALIR":
+            pygame.quit(); exit()
+        else:
+            estado = e.opcion
+
+# Registrar manejadores
+ControladorJugador(evento_mgr)
+ManejadorPowerUps(evento_mgr)
+controlador_enemigos = ControladorEnemigos(evento_mgr)
+ManejadorColisiones(evento_mgr)
+ManejadorEstrellas(evento_mgr)
+ManejadorMenu(evento_mgr)
+
+# Bucle principal
 while True:
-    # Actualizar mensaje temporal
     if tiempo_mensaje > 0:
         tiempo_mensaje -= 1
         if tiempo_mensaje <= 0:
@@ -167,46 +215,57 @@ while True:
 
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
-            pygame.quit()
-            exit()
+            pygame.quit(); exit()
 
-        # Manejo de eventos por estado
         if estado == "MENU":
             menu.manejar_eventos(ev)
-
         elif estado == "JUEGO" and ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_ESCAPE:
                 estado = "MENU"
-            # movimiento...
-
+            elif ev.key == pygame.K_UP:
+                evento_mgr.publicar(EventoMoverJugador('arriba'))
+            elif ev.key == pygame.K_DOWN:
+                evento_mgr.publicar(EventoMoverJugador('abajo'))
+            elif ev.key == pygame.K_LEFT:
+                evento_mgr.publicar(EventoMoverJugador('izquierda'))
+            elif ev.key == pygame.K_RIGHT:
+                evento_mgr.publicar(EventoMoverJugador('derecha'))
         elif estado == "GAME_OVER" and ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_RETURN:
-                reiniciar_juego()
-                estado = "JUEGO"
+                reiniciar_juego(); estado = "JUEGO"
             elif ev.key == pygame.K_ESCAPE:
                 estado = "MENU"
-
-        elif estado == "SALON_FAMA" and ev.type == pygame.KEYDOWN:
+        elif estado == "SALÓN_DE_LA_FAMA" and ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+            estado = "MENU"
+        elif estado == "ADMINISTRACION" and ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_ESCAPE:
                 estado = "MENU"
 
-        elif estado == "ADMINISTRACION" and ev.type == pygame.KEYDOWN:
-            # Aquí toda la lógica de creación/perfil/contraseña/borrado
-            # (copiar exactamente desde el bloque anterior)
-            pass
-
-    # Dibujo según estado
+    # Render según estado
     if estado == "MENU":
-        menu.dibujar()
-        vista.actualizar()
-
+        menu.dibujar(); vista.actualizar()
     elif estado == "JUEGO":
-        # Lógica y dibujo de juego
+        if vidas > 0 and (pos_x,pos_y) in estrellas:
+            evento_mgr.publicar(EventoRecogerEstrella((pos_x,pos_y)))
+        if vidas > 0 and (pos_x,pos_y) in powerups:
+            powerups.remove((pos_x,pos_y)); evento_mgr.publicar(EventoPowerUpAgarrado('congelar'))
+        controlador_enemigos.actualizar()
         vista.limpiar_pantalla((0,0,0))
-        vista.dibujar_laberinto(LABERINTO, TAM_CELDA)
-        # dibujar enemigos, estrellas, powerups, jugador, HUD...
+        # Colores por nivel si existen
+        lvl = NIVELES[nivel_actual]
+        col_pared = tuple(lvl.get("colores", {}).get("pared", (80,80,80)))
+        col_suelo = tuple(lvl.get("colores", {}).get("suelo", (220,220,220)))
+        # Asegurar firma de vista
+        if hasattr(vista, 'dibujar_laberinto') and vista.dibujar_laberinto.__code__.co_argcount >= 5:
+            vista.dibujar_laberinto(LABERINTO, TAM_CELDA, col_pared, col_suelo)
+        else:
+            vista.dibujar_laberinto(LABERINTO, TAM_CELDA)
+        for ex,ey in enemigos: vista.dibujar_enemigo(ex*TAM_CELDA, ey*TAM_CELDA, TAM_CELDA)
+        for sx,sy in estrellas: vista.dibujar_estrella(sx*TAM_CELDA, sy*TAM_CELDA, TAM_CELDA)
+        for px,py in powerups: vista.dibujar_powerup(px*TAM_CELDA, py*TAM_CELDA, TAM_CELDA)
+        vista.dibujar_jugador(pos_x*TAM_CELDA, pos_y*TAM_CELDA, TAM_CELDA)
+        vista.dibujar_hud(vidas, puntuacion)
         vista.actualizar()
-
     elif estado == "GAME_OVER":
         vista.limpiar_pantalla((50,0,0))
         vista.dibujar_texto("GAME OVER", 180,200,64,(255,0,0))
@@ -214,23 +273,22 @@ while True:
         vista.dibujar_texto("ENTER reint.",100,350,28,(200,200,200))
         vista.dibujar_texto("ESC menu",90,390,28,(200,200,200))
         vista.actualizar()
-
-    elif estado == "SALON_FAMA":
+    elif estado == "SALÓN_DE_LA_FAMA":
         vista.limpiar_pantalla((0,0,50))
-        vista.dibujar_texto("Salón De La Fama", 120,50,48,(255,255,0))
-        y = 120
-        for i,p in enumerate(cargar_puntuaciones()[:10]):
-            vista.dibujar_texto(f"{i+1}. {p['nombre']}: {p['puntuacion']}",150,y,28,(255,255,255))
-            y += 35
-        vista.dibujar_texto("ESC volver",180,550,28,(200,200,200))
+        vista.dibujar_texto("Salón de la Fama", 150, 250, 48, (255,255,0))
+        y_pos = 320
+        for i, entrada in enumerate(cargar_puntuaciones()[:10]):
+            if isinstance(entrada, dict) and 'nombre' in entrada and 'puntuacion' in entrada:
+                vista.dibujar_texto(f"{i+1}. {entrada['nombre']}: {entrada['puntuacion']}", 120, y_pos, 24, (255,255,255))
+                y_pos += 30
+        vista.dibujar_texto("ESC volver", 120, 550, 32, (200,200,200))
         vista.actualizar()
-
     elif estado == "ADMINISTRACION":
-        vista.limpiar_pantalla((50,0,50))
-        vista.dibujar_texto("Administración",150,50,48,(255,255,0))
-        vista.dibujar_texto(f"Jugadores: {len(cargar_perfiles())}",150,90,24,(200,200,200))
-        # Mostrar menús de creación, selección, contraseña, borrado
-        # (copiar textos y cajas de tu versión previa)
+        vista.limpiar_pantalla((50,0,0))
+        vista.dibujar_texto("Administración", 180, 250, 48, (255,255,0))
+        vista.dibujar_texto("ESC volver", 120, 350, 32, (200,200,200))
+        if mensaje_error:
+            vista.dibujar_texto(mensaje_error, 50, 300, 24, (255,100,100))
         vista.actualizar()
 
     reloj.tick(60)
