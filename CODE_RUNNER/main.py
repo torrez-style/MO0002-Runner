@@ -10,7 +10,6 @@ from evento import (
 from vista import Vista
 from menu import MenuPrincipal
 from pathfinding import bfs_siguiente_paso, distancia_manhattan
-
 # CONFIGURACIÓN
 ANCHO, ALTO = 900, 700
 FPS = 50
@@ -42,6 +41,7 @@ tiempo_mensaje = 0
 PLAYER_STEP_DELAY = 7
 player_step_timer = 0
 held_dirs = set()
+
 
 
 def cargar_json(path, default=None):
@@ -272,7 +272,7 @@ while True:
         col_enem = tuple(lvl.get("colores", {}).get("enemigo", (220,50,50)))
         vista.dibujar_laberinto(LABERINTO, TAM_CELDA, col_pared, col_suelo)
         for ex,ey in enemigos: vista.dibujar_enemigo(ex*TAM_CELDA, ey*TAM_CELDA, TAM_CELDA, color=col_enem)
-        for sx,sy in estrellas: vista.dibujar_estrella(sx*TAM_CELDA, sy*TAM_CELDA, TAM_CELDA)
+        for sx,sy in estrellas: vista.dibujar_estrella(sx*TAM_CELDA, sy*TAM_CELDA, TAM_CELDA)  
         for px,py in powerups: vista.dibujar_powerup(px*TAM_CELDA, py*TAM_CELDA, TAM_CELDA)
         vista.dibujar_jugador(pos_x*TAM_CELDA, pos_y*TAM_CELDA, TAM_CELDA)
         vista.dibujar_hud(vidas, puntuacion)
