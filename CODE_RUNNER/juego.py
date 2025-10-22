@@ -4,30 +4,25 @@ import os
 import random
 from evento import (
     EventoMoverJugador, EventoSeleccionMenu, EventoColisionEnemigo,
-    EventoRecogerEstrella, EventoPowerUpAgarrado, AdministradorDeEventos
+    EventoRecogerEstrella, EventoPowerUpAgarrado, EventoSalirNivel, AdministradorDeEventos
 )
 from vista import Vista
 from menu import MenuPrincipal
-from pathfinding import bfs_siguiente_paso, distancia_manhattan
+from pathfinding import bfs_siguiente_paso
 
 class Juego:
     def __init__(self, ancho=900, alto=700, fps=50, niveles_path="niveles.json"):
-        # Config
         self.ANCHO, self.ALTO = ancho, alto
         self.FPS = fps
-        self.RANGO = 999
         self.DURACION_POWERUP = 300
         self.niveles_path = niveles_path
-        
         # Estado general
         self.niveles = self._cargar_niveles()
         self.nivel_actual = 0
         self.LABERINTO = self.niveles[0]["laberinto"]
         self.FRAME_ENE = max(12, self.niveles[0].get("vel_enemigos", 18))
-        
         self.tam_celda = 40
-        self.pos_x = 1
-        self.pos_y = 1
+        self.pos_x = 1; self.pos_y = 1
         self.estrellas = []
         self.enemigos = []
         self.powerups = []
@@ -38,41 +33,27 @@ class Juego:
         self.powerup_activo = None
         self.puntuacion_final = 0
         self.estado = "MENU"
-        
+        self.salida_pos = None
         # Entrada continua
         self.PLAYER_STEP_DELAY = 7
         self.player_step_timer = 0
         self.held_dirs = set()
-        
         # Pygame / Vista / Eventos
         pygame.init()
         self.reloj = pygame.time.Clock()
         self.vista = Vista(self.ANCHO, self.ALTO, f"Maze-Run - Nivel {self.nivel_actual+1}")
         self.evento_mgr = AdministradorDeEventos()
         self.menu = MenuPrincipal(self.vista, self.evento_mgr)
-        
         # Registrar manejadores
         self._registrar_manejadores()
-        
         # Layout inicial
         self._configurar_tablero()
         self._reiniciar_juego()
 
-    # --------- Carga y utilidades ---------
     def _cargar_niveles(self):
         with open(self.niveles_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data["niveles"]
-
-    def _cargar_json(self, path, default=None):
-        if not os.path.exists(path):
-            return default if default is not None else []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                txt = f.read().strip()
-                return json.loads(txt) if txt else (default if default is not None else [])
-        except json.JSONDecodeError:
-            return default if default is not None else []
 
     def _configurar_tablero(self):
         filas, cols = len(self.LABERINTO), len(self.LABERINTO[0])
@@ -83,35 +64,48 @@ class Juego:
         self.vista.offset_x = (self.vista.ancho - tablero_w) // 2
         self.vista.offset_y = (self.vista.alto - tablero_h) // 2 + 20
 
-    # --------- Generación y estado ---------
     def _generar_posiciones_validas(self, lab, c, ex):
         pos = []
         filas, cols = len(lab), len(lab[0])
         i = 0
         while len(pos) < c and i < c * 50:
             x, y = random.randint(1, cols - 2), random.randint(1, filas - 2)
+            # Solo en celdas libres (0), no en entradas (2) ni salidas (3)
             if lab[y][x] == 0 and (x, y) not in ex + pos:
                 pos.append((x, y))
             i += 1
         return pos
+
+    def _encontrar_entrada_salida(self, lab):
+        entrada = salida = None
+        for y, fila in enumerate(lab):
+            for x, celda in enumerate(fila):
+                if celda == 2: entrada = (x, y)
+                elif celda == 3: salida = (x, y)
+        return entrada, salida
 
     def _jugador_celda_libre(self):
         libres = [
             (x, y)
             for y in range(1, len(self.LABERINTO) - 1)
             for x in range(1, len(self.LABERINTO[0]) - 1)
-            if self.LABERINTO[y][x] == 0 and (x, y) not in self.enemigos
+            if self.LABERINTO[y][x] in [0, 2, 3] and (x, y) not in self.enemigos
         ]
         return random.choice(libres) if libres else (1, 1)
 
     def _reiniciar_juego(self):
         lvl = self.niveles[self.nivel_actual]
         LAB = lvl["laberinto"]
-        self.pos_x, self.pos_y = 1, 1
-        self.estrellas = self._generar_posiciones_validas(LAB, lvl.get("estrellas", 3), [(1, 1)])
-        self.enemigos = self._generar_posiciones_validas(LAB, lvl.get("enemigos", 2), [(1, 1)] + self.estrellas)
-        self.powerups = self._generar_posiciones_validas(LAB, lvl.get("powerups", 2), [(1, 1)] + self.estrellas + self.enemigos)
-        self.vidas, self.puntuacion, self.contador_frames = 3, 0, 0
+        # Determinar posición inicial: entrada si existe, sino (1,1)
+        entrada, salida = self._encontrar_entrada_salida(LAB)
+        self.pos_x, self.pos_y = entrada if entrada else (1, 1)
+        self.salida_pos = salida
+        # Generar elementos evitando entrada y salida
+        exclusiones = [self.pos_x, self.pos_y] + ([entrada] if entrada else []) + ([salida] if salida else [])
+        self.estrellas = self._generar_posiciones_validas(LAB, lvl.get("estrellas", 3), exclusiones)
+        self.enemigos = self._generar_posiciones_validas(LAB, lvl.get("enemigos", 2), exclusiones + self.estrellas)
+        self.powerups = self._generar_posiciones_validas(LAB, lvl.get("powerups", 2), exclusiones + self.estrellas + self.enemigos)
+        self.vidas, self.contador_frames = self.vidas, 0  # mantener vidas entre niveles
         self.powerup_activo, self.powerup_timer = None, 0
 
     def _avanzar_nivel(self):
@@ -122,6 +116,7 @@ class Juego:
             self.FRAME_ENE = max(10, lvl.get("vel_enemigos", 12))
             self._configurar_tablero()
             self._reiniciar_juego()
+            self.vista.titulo = f"Maze-Run - Nivel {self.nivel_actual+1}"
         else:
             self._estado_cambiar_a_game_over()
 
@@ -129,7 +124,6 @@ class Juego:
         self.puntuacion_final = self.puntuacion
         self.estado = "GAME_OVER"
 
-    # --------- Manejadores ---------
     def _registrar_manejadores(self):
         class ControladorJugador:
             def __init__(self, juego, mgr): self.juego=juego; mgr.registrar(EventoMoverJugador, self)
@@ -142,7 +136,7 @@ class Juego:
                 elif e.direccion=='izquierda': dx=-1
                 elif e.direccion=='derecha': dx=1
                 nx,ny=j.pos_x+dx,j.pos_y+dy
-                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx]==0:
+                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2,3]:
                     j.pos_x,j.pos_y=nx,ny
         
         class ManejadorPowerUps:
@@ -168,11 +162,11 @@ class Juego:
                     if not paso:
                         for dx,dy in [(0,1),(0,-1),(1,0),(-1,0)]:
                             nx,ny=ex+dx,ey+dy
-                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx]==0 and (nx,ny) not in ocup:
+                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2,3] and (nx,ny) not in ocup:
                                 paso=(nx,ny); break
                     ex,ey=paso or (ex,ey)
                     if (ex,ey)==(j.pos_x,j.pos_y) and j.powerup_activo!='invulnerable':
-                        self.j.evento_mgr.publicar(EventoColisionEnemigo((j.pos_x,j.pos_y),(ex,ey)))
+                        j.evento_mgr.publicar(EventoColisionEnemigo((j.pos_x,j.pos_y),(ex,ey)))
                     ocup.add((ex,ey)); nuevos.append((ex,ey))
                 j.enemigos=nuevos
         
@@ -191,15 +185,18 @@ class Juego:
                 j=self.j
                 if e.posicion in j.estrellas:
                     j.estrellas.remove(e.posicion)
-                    j.puntuacion+=10
-                    if not j.estrellas:
-                        j._avanzar_nivel(); j.vista.titulo=f"Maze-Run - Nivel {j.nivel_actual+1}"
+                    j.puntuacion+=10  # Estrellas opcionales pero dan puntos
+        
+        class ManejadorSalida:
+            def __init__(self, juego, mgr): self.j=juego; mgr.registrar(EventoSalirNivel, self)
+            def notificar(self, e):
+                self.j._avanzar_nivel()
         
         class ManejadorMenu:
             def __init__(self, juego, mgr): self.j=juego; mgr.registrar(EventoSeleccionMenu, self)
             def notificar(self, e):
                 j=self.j
-                if e.opcion=="JUEGO": j._reiniciar_juego(); j.estado="JUEGO"
+                if e.opcion=="JUEGO": j.nivel_actual=0; j._reiniciar_juego(); j.estado="JUEGO"
                 elif e.opcion=="SALIR": pygame.quit(); exit()
                 else: j.estado=e.opcion
         
@@ -208,9 +205,9 @@ class Juego:
         ManejadorPowerUps(self, self.evento_mgr)
         ManejadorColisiones(self, self.evento_mgr)
         ManejadorEstrellas(self, self.evento_mgr)
+        ManejadorSalida(self, self.evento_mgr)
         ManejadorMenu(self, self.evento_mgr)
 
-    # --------- Loop ---------
     def run(self):
         while True:
             for ev in pygame.event.get():
@@ -233,7 +230,7 @@ class Juego:
                 elif self.estado=="GAME_OVER":
                     if ev.type==pygame.KEYDOWN:
                         if ev.key==pygame.K_ESCAPE: self.estado="MENU"
-                        elif ev.key==pygame.K_RETURN: self._reiniciar_juego(); self.estado="JUEGO"
+                        elif ev.key==pygame.K_RETURN: self.nivel_actual=0; self._reiniciar_juego(); self.estado="JUEGO"
 
             if self.estado=="JUEGO":
                 if self.held_dirs:
@@ -244,10 +241,16 @@ class Juego:
                         elif 'izquierda' in self.held_dirs: self.evento_mgr.publicar(EventoMoverJugador('izquierda'))
                         elif 'derecha' in self.held_dirs: self.evento_mgr.publicar(EventoMoverJugador('derecha'))
                         self.player_step_timer=self.PLAYER_STEP_DELAY
+                # Recoger estrellas (opcional)
                 if self.vidas>0 and (self.pos_x,self.pos_y) in self.estrellas:
                     self.evento_mgr.publicar(EventoRecogerEstrella((self.pos_x,self.pos_y)))
+                # Recoger powerups
                 if self.vidas>0 and (self.pos_x,self.pos_y) in self.powerups:
-                    self.powerups.remove((self.pos_x,self.pos_y)); self.evento_mgr.publicar(EventoPowerUpAgarrado('congelar'))
+                    self.powerups.remove((self.pos_x,self.pos_y)); self.evento_mgr.publicar(EventoPowerUpAgarrado(random.choice(['invulnerable','congelar','invisible'])))
+                # Salir por la salida marcada (celda 3)
+                if self.vidas>0 and self.salida_pos and (self.pos_x,self.pos_y)==self.salida_pos:
+                    self.evento_mgr.publicar(EventoSalirNivel())
+                
                 self.controlador_enemigos.actualizar()
 
                 # Render
@@ -272,5 +275,31 @@ class Juego:
                 self.vista.dibujar_texto(f"Puntaje final: {self.puntuacion_final}", 200, 280, 36, (255,255,255))
                 self.vista.dibujar_texto("ENTER: Reintentar    ESC: Menú", 160, 340, 28, (220,220,220))
                 self.vista.actualizar()
+            elif self.estado=="SALÓN_DE_LA_FAMA":
+                self.vista.limpiar_pantalla((0,0,50))
+                self.vista.dibujar_texto("Salón de la Fama", 150, 200, 48, (255,255,0))
+                puntuaciones = self._cargar_json("puntuaciones.json", [])
+                y_pos = 270
+                for i, entrada in enumerate(puntuaciones[:10]):
+                    if isinstance(entrada, dict) and 'nombre' in entrada and 'puntuacion' in entrada:
+                        self.vista.dibujar_texto(f"{i+1}. {entrada['nombre']}: {entrada['puntuacion']}", 120, y_pos, 24, (255,255,255))
+                        y_pos += 30
+                self.vista.dibujar_texto("ESC: Volver", 120, 550, 32, (200,200,200))
+                self.vista.actualizar()
+            elif self.estado=="ADMINISTRACION":
+                self.vista.limpiar_pantalla((50,0,0))
+                self.vista.dibujar_texto("Administración", 180, 250, 48, (255,255,0))
+                self.vista.dibujar_texto("ESC: Volver", 120, 350, 32, (200,200,200))
+                self.vista.actualizar()
 
             self.reloj.tick(self.FPS)
+    
+    def _cargar_json(self, path, default=None):
+        if not os.path.exists(path):
+            return default if default is not None else []
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                txt = f.read().strip()
+                return json.loads(txt) if txt else (default if default is not None else [])
+        except json.JSONDecodeError:
+            return default if default is not None else []
