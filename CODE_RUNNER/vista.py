@@ -22,7 +22,16 @@ class Vista:
                 rx = self.offset_x + x*tam_celda
                 ry = self.offset_y + y*tam_celda
                 rect = pygame.Rect(rx, ry, tam_celda, tam_celda)
-                color = color_pared if celda == 1 else color_suelo
+                
+                if celda == 1:  # Pared
+                    color = color_pared
+                elif celda == 2:  # Entrada (naranja)
+                    color = (255, 150, 0)
+                elif celda == 3:  # Salida (verde brillante)
+                    color = (0, 255, 0)
+                else:  # Suelo normal (0)
+                    color = color_suelo
+                    
                 pygame.draw.rect(self.pantalla, color, rect)
                 if dibujar_rejilla:
                     pygame.draw.rect(self.pantalla, (40,40,40), rect, 1)
