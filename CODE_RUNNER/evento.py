@@ -33,6 +33,10 @@ class EventoPowerUpAgarrado(Evento):
     def __init__(self, tipo):
         self.tipo = tipo  # 'invulnerable', 'congelar', 'invisible'
 
+class EventoSalirNivel(Evento):
+    """Evento que se dispara cuando el jugador llega a la salida del nivel"""
+    pass
+
 class AdministradorDeEventos:
     def __init__(self):
         self.escuchas = {}
