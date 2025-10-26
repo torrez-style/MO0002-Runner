@@ -4,7 +4,7 @@ import os
 import random
 from evento import (
     EventoMoverJugador, EventoSeleccionMenu, EventoColisionEnemigo,
-    EventoRecogerEstrella, EventoPowerUpAgarrado, EventoSalirNivel, AdministradorDeEventos
+    EventoRecogerEstrella, EventoPowerUpAgarrado, AdministradorDeEventos
 )
 from vista import Vista
 from menu import MenuPrincipal
@@ -32,7 +32,6 @@ class Juego:
         self.powerup_activo = None
         self.puntuacion_final = 0
         self.estado = "MENU"
-        self.salida_pos = None
         self.texto_mensaje = ""
         self.mensaje_frames = 0
         self.PLAYER_STEP_DELAY = 7
@@ -82,32 +81,28 @@ class Juego:
             i += 1
         return pos
 
-    def _encontrar_entrada_salida(self, lab):
-        entrada = salida = None
+    def _encontrar_entrada(self, lab):
         for y, fila in enumerate(lab):
             for x, celda in enumerate(fila):
-                if celda == 2: entrada = (x, y)
-                elif celda == 3: salida = (x, y)
-        return entrada, salida
+                if celda == 2: return (x, y)
+        return (1, 1)
 
     def _jugador_celda_libre(self):
         libres = [
             (x, y)
             for y in range(1, len(self.LABERINTO) - 1)
             for x in range(1, len(self.LABERINTO[0]) - 1)
-            if self.LABERINTO[y][x] in [0, 2, 3] and (x, y) not in self.enemigos
+            if self.LABERINTO[y][x] in [0, 2] and (x, y) not in self.enemigos
         ]
         return random.choice(libres) if libres else (1, 1)
 
     def _reiniciar_juego(self):
         lvl = self.niveles[self.nivel_actual]
         LAB = lvl["laberinto"]
-        entrada, salida = self._encontrar_entrada_salida(LAB)
+        entrada = self._encontrar_entrada(LAB)
         self.pos_x, self.pos_y = entrada if entrada else (1, 1)
-        self.salida_pos = salida
         exclusiones = [self.pos_x, self.pos_y]
         if entrada: exclusiones.append(entrada)
-        if salida: exclusiones.append(salida)
         self.estrellas = self._generar_posiciones_validas(LAB, lvl.get("estrellas", 3), exclusiones)
         self.enemigos = self._generar_posiciones_validas(LAB, lvl.get("enemigos", 2), exclusiones + self.estrellas)
         self.powerups = self._generar_posiciones_validas(LAB, lvl.get("powerups", 2), exclusiones + self.estrellas + self.enemigos)
@@ -145,7 +140,7 @@ class Juego:
                 elif e.direccion=='izquierda': dx=-1
                 elif e.direccion=='derecha': dx=1
                 nx,ny=j.pos_x+dx,j.pos_y+dy
-                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2,3]:
+                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2]:
                     j.pos_x,j.pos_y=nx,ny
         
         class ManejadorPowerUps:
@@ -171,7 +166,7 @@ class Juego:
                     if not paso:
                         for dx,dy in [(0,1),(0,-1),(1,0),(-1,0)]:
                             nx,ny=ex+dx,ey+dy
-                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2,3] and (nx,ny) not in ocup:
+                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2] and (nx,ny) not in ocup:
                                 paso=(nx,ny); break
                     ex,ey=paso or (ex,ey)
                     if (ex,ey)==(j.pos_x,j.pos_y) and j.powerup_activo!='invulnerable':
@@ -195,16 +190,9 @@ class Juego:
                 if e.posicion in j.estrellas:
                     j.estrellas.remove(e.posicion)
                     j.puntuacion+=10
-        
-        class ManejadorSalida:
-            def __init__(self, juego, mgr): self.j=juego; mgr.registrar(EventoSalirNivel, self)
-            def notificar(self, e):
-                j=self.j
-                if not j.estrellas:
-                    j._avanzar_nivel()
-                else:
-                    j.texto_mensaje = "¡Debes recoger todas las estrellas!"
-                    j.mensaje_frames = 100
+                    # Si recolectó la última estrella avanza automáticamente
+                    if not j.estrellas:
+                        j._avanzar_nivel()
         
         class ManejadorMenu:
             def __init__(self, juego, mgr): self.j=juego; mgr.registrar(EventoSeleccionMenu, self)
@@ -220,7 +208,6 @@ class Juego:
         ManejadorPowerUps(self, self.evento_mgr)
         ManejadorColisiones(self, self.evento_mgr)
         ManejadorEstrellas(self, self.evento_mgr)
-        ManejadorSalida(self, self.evento_mgr)
         ManejadorMenu(self, self.evento_mgr)
 
     def run(self):
@@ -256,18 +243,14 @@ class Juego:
                         elif 'izquierda' in self.held_dirs: self.evento_mgr.publicar(EventoMoverJugador('izquierda'))
                         elif 'derecha' in self.held_dirs: self.evento_mgr.publicar(EventoMoverJugador('derecha'))
                         self.player_step_timer=self.PLAYER_STEP_DELAY
-                # Recoger estrellas (obligatorio para avanzar)
+                # Recoger estrellas y auto-avanzar nivel
                 if self.vidas>0 and (self.pos_x,self.pos_y) in self.estrellas:
                     self.evento_mgr.publicar(EventoRecogerEstrella((self.pos_x,self.pos_y)))
                 # Recoger powerups
                 if self.vidas>0 and (self.pos_x,self.pos_y) in self.powerups:
                     self.powerups.remove((self.pos_x,self.pos_y)); self.evento_mgr.publicar(EventoPowerUpAgarrado(random.choice(['invulnerable','congelar','invisible'])))
-                # Salir por la salida marcada (celda 3)
-                if self.vidas>0 and self.salida_pos and (self.pos_x,self.pos_y)==self.salida_pos:
-                    self.evento_mgr.publicar(EventoSalirNivel())
                 if self.mensaje_frames>0:
                     self.mensaje_frames-=1
-
                 self.controlador_enemigos.actualizar()
 
                 # Render
@@ -282,7 +265,6 @@ class Juego:
                 for px,py in self.powerups: self.vista.dibujar_powerup(px*self.tam_celda,py*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_jugador(self.pos_x*self.tam_celda,self.pos_y*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_hud(self.vidas,self.puntuacion)
-                # Mostrar mensaje bloqueado si hay
                 if self.texto_mensaje and self.mensaje_frames>0:
                     self.vista.dibujar_texto(self.texto_mensaje, 120, 60, 32, (255,64,64))
                 self.vista.actualizar()
@@ -310,7 +292,6 @@ class Juego:
                 self.vista.limpiar_pantalla((50,0,0))
                 self.vista.dibujar_texto("Administración", 180, 250, 48, (255,255,0))
                 self.vista.dibujar_texto("ESC: Volver", 120, 350, 32, (200,200,200))
-                # Si detecta archivo nuevo, recarga niveles automáticamente
                 self._reload_niveles()
                 self.estado = "MENU"
                 self.vista.actualizar()
