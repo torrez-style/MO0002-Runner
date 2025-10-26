@@ -16,12 +16,11 @@ class Juego:
         self.FPS = fps
         self.DURACION_POWERUP = 300
         self.niveles_path = niveles_path
-        # Estado general
         self.niveles = self._cargar_niveles()
         self.nivel_actual = 0
         self.LABERINTO = self.niveles[0]["laberinto"]
         self.FRAME_ENE = max(12, self.niveles[0].get("vel_enemigos", 18))
-        self.tam_celda = 40
+        self.tam_celda = 32  # REDUCIDO tamaño de celda para sprites más pequeños
         self.pos_x = 1; self.pos_y = 1
         self.estrellas = []
         self.enemigos = []
@@ -36,19 +35,15 @@ class Juego:
         self.salida_pos = None
         self.texto_mensaje = ""
         self.mensaje_frames = 0
-        # Entrada continua
         self.PLAYER_STEP_DELAY = 7
         self.player_step_timer = 0
         self.held_dirs = set()
-        # Pygame / Vista / Eventos
         pygame.init()
         self.reloj = pygame.time.Clock()
         self.vista = Vista(self.ANCHO, self.ALTO, f"Maze-Run - Nivel {self.nivel_actual+1}")
         self.evento_mgr = AdministradorDeEventos()
         self.menu = MenuPrincipal(self.vista, self.evento_mgr)
-        # Registrar manejadores
         self._registrar_manejadores()
-        # Layout inicial
         self._configurar_tablero()
         self._reiniciar_juego()
 
@@ -60,7 +55,7 @@ class Juego:
     def _configurar_tablero(self):
         filas, cols = len(self.LABERINTO), len(self.LABERINTO[0])
         area_w, area_h = 800, 600
-        self.tam_celda = max(24, min(area_w // cols, area_h // filas))
+        # self.tam_celda = max(24, min(area_w // cols, area_h // filas)) # ahora fijo en 32
         tablero_w = self.tam_celda * cols
         tablero_h = self.tam_celda * filas
         self.vista.offset_x = (self.vista.ancho - tablero_w) // 2
@@ -72,7 +67,6 @@ class Juego:
         i = 0
         while len(pos) < c and i < c * 50:
             x, y = random.randint(1, cols - 2), random.randint(1, filas - 2)
-            # Solo en celdas libres (0), no en entradas (2) ni salidas (3)
             if lab[y][x] == 0 and (x, y) not in ex + pos:
                 pos.append((x, y))
             i += 1
@@ -98,16 +92,17 @@ class Juego:
     def _reiniciar_juego(self):
         lvl = self.niveles[self.nivel_actual]
         LAB = lvl["laberinto"]
-        # Determinar posición inicial: entrada si existe, sino (1,1)
         entrada, salida = self._encontrar_entrada_salida(LAB)
         self.pos_x, self.pos_y = entrada if entrada else (1, 1)
         self.salida_pos = salida
-        # Generar elementos evitando entrada y salida
-        exclusiones = [self.pos_x, self.pos_y] + ([entrada] if entrada else []) + ([salida] if salida else [])
+        exclusiones = [self.pos_x, self.pos_y]
+        if entrada: exclusiones.append(entrada)
+        if salida: exclusiones.append(salida)
         self.estrellas = self._generar_posiciones_validas(LAB, lvl.get("estrellas", 3), exclusiones)
         self.enemigos = self._generar_posiciones_validas(LAB, lvl.get("enemigos", 2), exclusiones + self.estrellas)
         self.powerups = self._generar_posiciones_validas(LAB, lvl.get("powerups", 2), exclusiones + self.estrellas + self.enemigos)
-        self.vidas, self.contador_frames = self.vidas, 0
+        self.vidas = 3 # <--- Corregido para reiniciar vidas al reiniciar juego
+        self.contador_frames = 0
         self.powerup_activo, self.powerup_timer = None, 0
         self.texto_mensaje = ""
         self.mensaje_frames = 0
