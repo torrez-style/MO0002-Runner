@@ -20,7 +20,7 @@ class Juego:
         self.nivel_actual = 0
         self.LABERINTO = self.niveles[0]["laberinto"]
         self.FRAME_ENE = max(12, self.niveles[0].get("vel_enemigos", 18))
-        self.tam_celda = 32  # REDUCIDO tamaño de celda para sprites más pequeños
+        self.tam_celda = 32
         self.pos_x = 1; self.pos_y = 1
         self.estrellas = []
         self.enemigos = []
@@ -48,14 +48,24 @@ class Juego:
         self._reiniciar_juego()
 
     def _cargar_niveles(self):
-        with open(self.niveles_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data["niveles"]
+        try:
+            with open(self.niveles_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data["niveles"]
+        except Exception as ex:
+            return [{"nombre": "Error", "laberinto": [[1,1],[1,1]], "estrellas":1, "enemigos":1, "powerups":0}]
+
+    def _reload_niveles(self):
+        self.niveles = self._cargar_niveles()
+        self.nivel_actual = 0
+        self.LABERINTO = self.niveles[0]["laberinto"]
+        self._configurar_tablero()
+        self._reiniciar_juego()
+        self.vista.titulo = "Maze-Run - Nivel 1 (nuevos niveles)"
 
     def _configurar_tablero(self):
         filas, cols = len(self.LABERINTO), len(self.LABERINTO[0])
         area_w, area_h = 800, 600
-        # self.tam_celda = max(24, min(area_w // cols, area_h // filas)) # ahora fijo en 32
         tablero_w = self.tam_celda * cols
         tablero_h = self.tam_celda * filas
         self.vista.offset_x = (self.vista.ancho - tablero_w) // 2
@@ -101,7 +111,7 @@ class Juego:
         self.estrellas = self._generar_posiciones_validas(LAB, lvl.get("estrellas", 3), exclusiones)
         self.enemigos = self._generar_posiciones_validas(LAB, lvl.get("enemigos", 2), exclusiones + self.estrellas)
         self.powerups = self._generar_posiciones_validas(LAB, lvl.get("powerups", 2), exclusiones + self.estrellas + self.enemigos)
-        self.vidas = 3 # <--- Corregido para reiniciar vidas al reiniciar juego
+        self.vidas = 3
         self.contador_frames = 0
         self.powerup_activo, self.powerup_timer = None, 0
         self.texto_mensaje = ""
@@ -202,6 +212,7 @@ class Juego:
                 j=self.j
                 if e.opcion=="JUEGO": j.nivel_actual=0; j._reiniciar_juego(); j.estado="JUEGO"
                 elif e.opcion=="SALIR": pygame.quit(); exit()
+                elif e.opcion=="ADMINISTRACION": j._reload_niveles(); j.estado="MENU"
                 else: j.estado=e.opcion
         
         self.controlador_enemigos = ControladorEnemigos(self, self.evento_mgr)
@@ -299,6 +310,9 @@ class Juego:
                 self.vista.limpiar_pantalla((50,0,0))
                 self.vista.dibujar_texto("Administración", 180, 250, 48, (255,255,0))
                 self.vista.dibujar_texto("ESC: Volver", 120, 350, 32, (200,200,200))
+                # Si detecta archivo nuevo, recarga niveles automáticamente
+                self._reload_niveles()
+                self.estado = "MENU"
                 self.vista.actualizar()
 
             self.reloj.tick(self.FPS)
