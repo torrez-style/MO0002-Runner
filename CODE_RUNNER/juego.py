@@ -34,6 +34,8 @@ class Juego:
         self.puntuacion_final = 0
         self.estado = "MENU"
         self.salida_pos = None
+        self.texto_mensaje = ""
+        self.mensaje_frames = 0
         # Entrada continua
         self.PLAYER_STEP_DELAY = 7
         self.player_step_timer = 0
@@ -105,8 +107,10 @@ class Juego:
         self.estrellas = self._generar_posiciones_validas(LAB, lvl.get("estrellas", 3), exclusiones)
         self.enemigos = self._generar_posiciones_validas(LAB, lvl.get("enemigos", 2), exclusiones + self.estrellas)
         self.powerups = self._generar_posiciones_validas(LAB, lvl.get("powerups", 2), exclusiones + self.estrellas + self.enemigos)
-        self.vidas, self.contador_frames = self.vidas, 0  # mantener vidas entre niveles
+        self.vidas, self.contador_frames = self.vidas, 0
         self.powerup_activo, self.powerup_timer = None, 0
+        self.texto_mensaje = ""
+        self.mensaje_frames = 0
 
     def _avanzar_nivel(self):
         if self.nivel_actual < len(self.niveles) - 1:
@@ -185,12 +189,17 @@ class Juego:
                 j=self.j
                 if e.posicion in j.estrellas:
                     j.estrellas.remove(e.posicion)
-                    j.puntuacion+=10  # Estrellas opcionales pero dan puntos
+                    j.puntuacion+=10
         
         class ManejadorSalida:
             def __init__(self, juego, mgr): self.j=juego; mgr.registrar(EventoSalirNivel, self)
             def notificar(self, e):
-                self.j._avanzar_nivel()
+                j=self.j
+                if not j.estrellas:
+                    j._avanzar_nivel()
+                else:
+                    j.texto_mensaje = "¡Debes recoger todas las estrellas!"
+                    j.mensaje_frames = 100
         
         class ManejadorMenu:
             def __init__(self, juego, mgr): self.j=juego; mgr.registrar(EventoSeleccionMenu, self)
@@ -241,7 +250,7 @@ class Juego:
                         elif 'izquierda' in self.held_dirs: self.evento_mgr.publicar(EventoMoverJugador('izquierda'))
                         elif 'derecha' in self.held_dirs: self.evento_mgr.publicar(EventoMoverJugador('derecha'))
                         self.player_step_timer=self.PLAYER_STEP_DELAY
-                # Recoger estrellas (opcional)
+                # Recoger estrellas (obligatorio para avanzar)
                 if self.vidas>0 and (self.pos_x,self.pos_y) in self.estrellas:
                     self.evento_mgr.publicar(EventoRecogerEstrella((self.pos_x,self.pos_y)))
                 # Recoger powerups
@@ -250,7 +259,9 @@ class Juego:
                 # Salir por la salida marcada (celda 3)
                 if self.vidas>0 and self.salida_pos and (self.pos_x,self.pos_y)==self.salida_pos:
                     self.evento_mgr.publicar(EventoSalirNivel())
-                
+                if self.mensaje_frames>0:
+                    self.mensaje_frames-=1
+
                 self.controlador_enemigos.actualizar()
 
                 # Render
@@ -265,6 +276,9 @@ class Juego:
                 for px,py in self.powerups: self.vista.dibujar_powerup(px*self.tam_celda,py*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_jugador(self.pos_x*self.tam_celda,self.pos_y*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_hud(self.vidas,self.puntuacion)
+                # Mostrar mensaje bloqueado si hay
+                if self.texto_mensaje and self.mensaje_frames>0:
+                    self.vista.dibujar_texto(self.texto_mensaje, 120, 60, 32, (255,64,64))
                 self.vista.actualizar()
 
             elif self.estado=="MENU":
@@ -293,7 +307,7 @@ class Juego:
                 self.vista.actualizar()
 
             self.reloj.tick(self.FPS)
-    
+
     def _cargar_json(self, path, default=None):
         if not os.path.exists(path):
             return default if default is not None else []
