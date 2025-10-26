@@ -78,12 +78,23 @@ class MenuPrincipal:
             root.destroy()
 
     def verificar_laberintos_disponibles(self):
-        """Verifica si hay laberintos cargados para jugar"""
+        """Verifica si hay laberintos cargados para jugar - Fix de ruta"""
         try:
-            with open("CODE_RUNNER/niveles.json", "r", encoding="utf-8") as f:
+            # Intentar primero la ruta relativa (cuando se ejecuta desde CODE_RUNNER/)
+            ruta_niveles = "niveles.json"
+            if not os.path.exists(ruta_niveles):
+                # Fallback a ruta completa
+                ruta_niveles = "CODE_RUNNER/niveles.json"
+                
+            with open(ruta_niveles, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return "niveles" in data and isinstance(data["niveles"], list) and len(data["niveles"]) > 0
-        except (FileNotFoundError, json.JSONDecodeError):
+                hay_niveles = "niveles" in data and isinstance(data["niveles"], list) and len(data["niveles"]) > 0
+                print(f"DEBUG: Verificando laberintos en {ruta_niveles}: {hay_niveles}")
+                if hay_niveles:
+                    print(f"DEBUG: Encontrados {len(data['niveles'])} niveles")
+                return hay_niveles
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"DEBUG: Error verificando laberintos: {e}")
             return False
 
     def mostrar_mensaje_sin_laberintos(self):
@@ -112,14 +123,19 @@ class MenuPrincipal:
                 self.vista.pantalla.blit(surf, (x_op, y_op))
         else:
             # Mostrar menú principal con indicador de estado
+            laberintos_disponibles = self.verificar_laberintos_disponibles()
             for i, opcion in enumerate(self.opciones):
                 color = (255, 255, 0) if i == self.indice else (200, 200, 200)
                 
-                # Agregar indicador para JUEGO si no hay laberintos
+                # Agregar indicador para JUEGO
                 texto_opcion = opcion
-                if opcion == "JUEGO" and not self.verificar_laberintos_disponibles():
-                    texto_opcion += " (Sin laberintos)"
-                    color = (150, 150, 150) if i != self.indice else (255, 200, 100)
+                if opcion == "JUEGO":
+                    if laberintos_disponibles:
+                        texto_opcion += " (✓ Listo)"  # Checkmark
+                        color = (100, 255, 100) if i != self.indice else (150, 255, 150)
+                    else:
+                        texto_opcion += " (Sin laberintos)"
+                        color = (150, 150, 150) if i != self.indice else (255, 200, 100)
                 
                 surf = self.fuente_opcion.render(texto_opcion, True, color)
                 x_op = (self.vista.ancho - surf.get_width()) // 2
@@ -143,10 +159,12 @@ class MenuPrincipal:
                 
                 # Validación completa según HU-017
                 if self.validar_estructura_laberinto(data):
-                    # Guardar en el archivo de niveles
-                    with open("CODE_RUNNER/niveles.json", "w", encoding="utf-8") as fout:
+                    # Guardar en el archivo de niveles - usar ruta relativa
+                    ruta_destino = "niveles.json"
+                    with open(ruta_destino, "w", encoding="utf-8") as fout:
                         json.dump(data, fout, indent=2, ensure_ascii=False)
                     
+                    print(f"DEBUG: Laberintos guardados en {ruta_destino}")
                     messagebox.showinfo(
                         "Carga Exitosa", 
                         f"Se cargaron {len(data['niveles'])} laberinto(s) correctamente.\n\nYa puede jugar desde el menú principal."
@@ -214,7 +232,8 @@ class MenuPrincipal:
     def reiniciar_salon_fama(self):
         """Reinicia el salón de la fama vaciando puntuaciones"""
         try:
-            with open("CODE_RUNNER/puntuaciones.json", "w", encoding="utf-8") as f:
+            ruta_puntuaciones = "puntuaciones.json"
+            with open(ruta_puntuaciones, "w", encoding="utf-8") as f:
                 json.dump([], f)
             messagebox.showinfo("Reinicio Exitoso", "El salón de la fama ha sido vaciado correctamente.")
         except Exception as ex:
