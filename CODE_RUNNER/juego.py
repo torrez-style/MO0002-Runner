@@ -18,6 +18,15 @@ class Juego:
         self.niveles_path = niveles_path
         self.niveles = self._cargar_niveles()
         self.nivel_actual = 0
+        
+        # Fix para IndexError: Validar que existan niveles cargados
+        if not self.niveles or len(self.niveles) == 0:
+            # Crear nivel de emergencia si no hay niveles cargados
+            self.niveles = [self._crear_nivel_emergencia()]
+            self.sin_niveles_cargados = True
+        else:
+            self.sin_niveles_cargados = False
+            
         self.LABERINTO = self.niveles[0]["laberinto"]
         self.FRAME_ENE = max(12, self.niveles[0].get("vel_enemigos", 18))
         self.tam_celda = 32
@@ -46,21 +55,70 @@ class Juego:
         self._configurar_tablero()
         self._reiniciar_juego()
 
+    def _crear_nivel_emergencia(self):
+        """Crear un nivel básico cuando no hay niveles cargados"""
+        return {
+            "nombre": "Nivel de Emergencia - Carga laberintos desde Administración",
+            "laberinto": [
+                [1,1,1,1,1,1,1,1,1,1],
+                [1,2,0,0,0,0,0,0,3,1],
+                [1,0,1,1,1,1,1,0,0,1],
+                [1,0,0,0,0,0,0,0,1,1],
+                [1,1,1,1,1,1,1,1,1,1]
+            ],
+            "vel_enemigos": 20,
+            "estrellas": 1,
+            "enemigos": 0,
+            "powerups": 0,
+            "entrada": [1, 1],
+            "salida": [8, 1],
+            "colores": {
+                "pared": [100,100,100], 
+                "suelo": [200,200,200], 
+                "enemigo": [220,50,50], 
+                "salida": [0,255,0]
+            }
+        }
+
     def _cargar_niveles(self):
+        """Cargar niveles desde archivo JSON con manejo de errores mejorado"""
         try:
-            with open(self.niveles_path, "r", encoding="utf-8") as f:
+            # Construir ruta completa
+            ruta_completa = os.path.join("CODE_RUNNER", self.niveles_path)
+            if not os.path.exists(ruta_completa):
+                ruta_completa = self.niveles_path  # Fallback a ruta original
+            
+            with open(ruta_completa, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            return data["niveles"]
-        except Exception as ex:
-            return [{"nombre": "Error", "laberinto": [[1,1],[1,1]], "estrellas":1, "enemigos":1, "powerups":0}]
+            
+            if "niveles" in data and isinstance(data["niveles"], list):
+                return data["niveles"]
+            else:
+                return []  # Retornar lista vacía si no hay estructura correcta
+        except (FileNotFoundError, json.JSONDecodeError, KeyError) as ex:
+            print(f"Error cargando niveles: {ex}")
+            return []  # Retornar lista vacía en caso de error
 
     def _reload_niveles(self):
-        self.niveles = self._cargar_niveles()
-        self.nivel_actual = 0
-        self.LABERINTO = self.niveles[0]["laberinto"]
-        self._configurar_tablero()
-        self._reiniciar_juego()
-        self.vista.titulo = "Maze-Run - Nivel 1 (nuevos niveles)"
+        """Recargar niveles desde archivo - usado después de carga administrativa"""
+        nuevos_niveles = self._cargar_niveles()
+        
+        if nuevos_niveles and len(nuevos_niveles) > 0:
+            self.niveles = nuevos_niveles
+            self.sin_niveles_cargados = False
+            self.nivel_actual = 0
+            self.LABERINTO = self.niveles[0]["laberinto"]
+            self._configurar_tablero()
+            self._reiniciar_juego()
+            self.vista.titulo = "Maze-Run - Nivel 1 (nuevos niveles cargados)"
+            
+            # Mostrar mensaje de confirmación
+            self.texto_mensaje = f"¡{len(nuevos_niveles)} laberinto(s) cargado(s) exitosamente!"
+            self.mensaje_frames = 180  # 3.6 segundos a 50 FPS
+        else:
+            # Mantener nivel de emergencia si no se cargaron niveles válidos
+            self.texto_mensaje = "No se encontraron laberintos válidos"
+            self.mensaje_frames = 120
 
     def _configurar_tablero(self):
         filas, cols = len(self.LABERINTO), len(self.LABERINTO[0])
@@ -91,6 +149,10 @@ class Juego:
         return random.choice(libres) if libres else (1, 1)
 
     def _reiniciar_juego(self):
+        # Verificar que el índice de nivel sea válido
+        if self.nivel_actual >= len(self.niveles):
+            self.nivel_actual = 0
+        
         lvl = self.niveles[self.nivel_actual]
         self.LABERINTO = lvl["laberinto"]
         self.pos_x, self.pos_y = self._jugador_celda_libre()
@@ -189,7 +251,13 @@ class Juego:
             def __init__(self, juego, mgr): self.j=juego; mgr.registrar(EventoSeleccionMenu, self)
             def notificar(self, e):
                 j=self.j
-                if e.opcion=="JUEGO": j.nivel_actual=0; j._reiniciar_juego(); j.estado="JUEGO"
+                if e.opcion=="JUEGO": 
+                    # Solo iniciar si no estamos en modo emergencia o hay niveles reales
+                    if not j.sin_niveles_cargados:
+                        j.nivel_actual=0; j._reiniciar_juego(); j.estado="JUEGO"
+                    else:
+                        j.texto_mensaje = "Debe cargar laberintos desde Administración primero"
+                        j.mensaje_frames = 120
                 elif e.opcion=="SALIR": pygame.quit(); exit()
                 elif e.opcion=="ADMINISTRACION": j._reload_niveles(); j.estado="MENU"
                 else: j.estado=e.opcion
@@ -223,7 +291,12 @@ class Juego:
                 elif self.estado=="GAME_OVER":
                     if ev.type==pygame.KEYDOWN:
                         if ev.key==pygame.K_ESCAPE: self.estado="MENU"
-                        elif ev.key==pygame.K_RETURN: self.nivel_actual=0; self._reiniciar_juego(); self.estado="JUEGO"
+                        elif ev.key==pygame.K_RETURN: 
+                            if not self.sin_niveles_cargados:
+                                self.nivel_actual=0; self._reiniciar_juego(); self.estado="JUEGO"
+                elif self.estado=="SALÓN_DE_LA_FAMA":
+                    if ev.type==pygame.KEYDOWN and ev.key==pygame.K_ESCAPE:
+                        self.estado="MENU"
 
             if self.estado=="JUEGO":
                 if self.held_dirs:
@@ -256,6 +329,11 @@ class Juego:
                 for px,py in self.powerups: self.vista.dibujar_powerup(px*self.tam_celda,py*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_jugador(self.pos_x*self.tam_celda,self.pos_y*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_hud(self.vidas,self.puntuacion)
+                
+                # Mostrar mensaje si estamos en modo emergencia
+                if self.sin_niveles_cargados:
+                    self.vista.dibujar_texto("MODO DEMO - Cargar laberintos desde Administración", 50, 30, 24, (255,200,100))
+                
                 if self.texto_mensaje and self.mensaje_frames>0:
                     self.vista.dibujar_texto(self.texto_mensaje, 120, 60, 32, (255,64,64))
                 self.vista.actualizar()
@@ -266,7 +344,10 @@ class Juego:
                 self.vista.limpiar_pantalla((30,0,0))
                 self.vista.dibujar_texto("GAME OVER", 220, 200, 72, (255,80,80))
                 self.vista.dibujar_texto(f"Puntaje final: {self.puntuacion_final}", 200, 280, 36, (255,255,255))
-                self.vista.dibujar_texto("ENTER: Reintentar    ESC: Menú", 160, 340, 28, (220,220,220))
+                if not self.sin_niveles_cargados:
+                    self.vista.dibujar_texto("ENTER: Reintentar    ESC: Menú", 160, 340, 28, (220,220,220))
+                else:
+                    self.vista.dibujar_texto("ESC: Menú (Cargar laberintos desde Admin)", 120, 340, 28, (220,220,220))
                 self.vista.actualizar()
             elif self.estado=="SALÓN_DE_LA_FAMA":
                 self.vista.limpiar_pantalla((0,0,50))
