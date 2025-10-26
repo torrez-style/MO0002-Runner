@@ -81,31 +81,23 @@ class Juego:
             i += 1
         return pos
 
-    def _encontrar_entrada(self, lab):
-        for y, fila in enumerate(lab):
-            for x, celda in enumerate(fila):
-                if celda == 2: return (x, y)
-        return (1, 1)
-
     def _jugador_celda_libre(self):
         libres = [
             (x, y)
             for y in range(1, len(self.LABERINTO) - 1)
             for x in range(1, len(self.LABERINTO[0]) - 1)
-            if self.LABERINTO[y][x] in [0, 2] and (x, y) not in self.enemigos
+            if self.LABERINTO[y][x] == 0 and (x, y) not in self.enemigos
         ]
         return random.choice(libres) if libres else (1, 1)
 
     def _reiniciar_juego(self):
         lvl = self.niveles[self.nivel_actual]
-        LAB = lvl["laberinto"]
-        entrada = self._encontrar_entrada(LAB)
-        self.pos_x, self.pos_y = entrada if entrada else (1, 1)
+        self.LABERINTO = lvl["laberinto"]
+        self.pos_x, self.pos_y = self._jugador_celda_libre()
         exclusiones = [self.pos_x, self.pos_y]
-        if entrada: exclusiones.append(entrada)
-        self.estrellas = self._generar_posiciones_validas(LAB, lvl.get("estrellas", 3), exclusiones)
-        self.enemigos = self._generar_posiciones_validas(LAB, lvl.get("enemigos", 2), exclusiones + self.estrellas)
-        self.powerups = self._generar_posiciones_validas(LAB, lvl.get("powerups", 2), exclusiones + self.estrellas + self.enemigos)
+        self.estrellas = self._generar_posiciones_validas(self.LABERINTO, lvl.get("estrellas", 3), exclusiones)
+        self.enemigos = self._generar_posiciones_validas(self.LABERINTO, lvl.get("enemigos", 2), exclusiones + self.estrellas)
+        self.powerups = self._generar_posiciones_validas(self.LABERINTO, lvl.get("powerups", 2), exclusiones + self.estrellas + self.enemigos)
         self.vidas = 3
         self.contador_frames = 0
         self.powerup_activo, self.powerup_timer = None, 0
@@ -140,7 +132,7 @@ class Juego:
                 elif e.direccion=='izquierda': dx=-1
                 elif e.direccion=='derecha': dx=1
                 nx,ny=j.pos_x+dx,j.pos_y+dy
-                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2]:
+                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] == 0:
                     j.pos_x,j.pos_y=nx,ny
         
         class ManejadorPowerUps:
@@ -166,7 +158,7 @@ class Juego:
                     if not paso:
                         for dx,dy in [(0,1),(0,-1),(1,0),(-1,0)]:
                             nx,ny=ex+dx,ey+dy
-                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] in [0,2] and (nx,ny) not in ocup:
+                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] == 0 and (nx,ny) not in ocup:
                                 paso=(nx,ny); break
                     ex,ey=paso or (ex,ey)
                     if (ex,ey)==(j.pos_x,j.pos_y) and j.powerup_activo!='invulnerable':
@@ -190,7 +182,6 @@ class Juego:
                 if e.posicion in j.estrellas:
                     j.estrellas.remove(e.posicion)
                     j.puntuacion+=10
-                    # Si recolectó la última estrella avanza automáticamente
                     if not j.estrellas:
                         j._avanzar_nivel()
         
