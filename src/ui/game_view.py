@@ -1,5 +1,5 @@
 """
-Vista principal de juego (placeholder mínimo)
+Vista del juego adaptada a ventana con cálculo de offset centrado
 """
 import pygame
 from config.settings import settings
@@ -14,23 +14,22 @@ class GameView:
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            # Dejar al GameEngine cambiar estado; placeholder sin transición directa
             pass
 
     def update(self, delta_time: float):
         pass
 
     def render(self):
+        w, h = self.screen.get_size()
         self.screen.fill(self.bg_color)
-        title = self.font_title.render("Maze Runner - Vista", True, (240, 240, 240))
-        self.screen.blit(title, (40, 40))
+        title = self.font_title.render("Vista del juego", True, (240, 240, 240))
+        self.screen.blit(title, ((w - title.get_width()) // 2, int(h*0.07)))
         info = [
-            "Este es un placeholder de la vista del juego.",
-            "Integraremos laberinto, jugador, enemigos y HUD en las siguientes fases.",
-            "Presione ESC para volver al menú (próxima iteración)."
+            "Laberinto y elementos se adaptan al tamaño de ventana.",
+            "El render del nivel se centra usando offsets calculados.",
         ]
-        y = 120
+        y = int(h*0.15)
         for line in info:
             surf = self.font_text.render(line, True, (210, 210, 210))
-            self.screen.blit(surf, (40, y))
-            y += 36
+            self.screen.blit(surf, ((w - surf.get_width()) // 2, y))
+            y += 34
