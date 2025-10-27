@@ -1,5 +1,5 @@
 """
-Bootstrap: pantalla de Game Over muestra puntaje final y contador de intentos
+Bootstrap: efecto visual de impacto (flash) al perder vida
 """
 import random
 import pygame
@@ -28,7 +28,6 @@ class GameBootstrap:
         # HUD y lógica
         self.lives = 3
         self.score = 0
-        # Intentos
         self.attempts = 1
         # Enemigos
         self.enemy_tick = 0
@@ -36,6 +35,9 @@ class GameBootstrap:
         self.enemy_wander_timer = 0
         self.enemy_wander_interval = 90
         self.vision_range = 8
+        # Efecto visual
+        self.hit_flash_timer = 0
+        self.hit_flash_duration = 18  # ~0.3s a 60 FPS
 
     def load_levels(self, path="assets/config/levels.json"):
         data = load_json(path, {"niveles": []})
@@ -61,6 +63,7 @@ class GameBootstrap:
         self.win = False
         self.game_over = False
         self.enemy_wander_timer = 0
+        self.hit_flash_timer = 0
         return True
 
     def _can_move(self, x, y):
@@ -116,6 +119,7 @@ class GameBootstrap:
             return
         if tuple(self.player) in self.enemies:
             self.lives -= 1
+            self.hit_flash_timer = self.hit_flash_duration
             libres = [p for p in self._free_cells() if p not in self.enemies]
             if libres:
                 self.player[0], self.player[1] = random.choice(libres)
@@ -127,7 +131,6 @@ class GameBootstrap:
         if self.game_over:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    # Reiniciar nivel y aumentar intento
                     self.attempts += 1
                     self.load_levels()
                 elif event.key == pygame.K_ESCAPE:
@@ -156,6 +159,8 @@ class GameBootstrap:
     def update(self):
         if self.game_over:
             return
+        if self.hit_flash_timer > 0:
+            self.hit_flash_timer -= 1
         self.enemy_tick += 1
         self.enemy_wander_timer += 1
         if self.enemy_tick >= self.enemy_delay:
@@ -227,6 +232,7 @@ class GameBootstrap:
             screen.blit(info2, ((w - info2.get_width())//2, int(h*0.62)))
             return
 
+        # Render normal
         self.renderer.draw_maze(screen, self.grid, self.colors, offset=offset)
         for sx, sy in self.stars:
             rect = pygame.Rect(offset[0] + sx*cell + 10, offset[1] + sy*cell + 10, cell-20, cell-20)
@@ -237,6 +243,14 @@ class GameBootstrap:
         for e in self.enemies:
             self.renderer.draw_enemy(screen, e, color=tuple(self.colors.get("enemigo", (220,50,50))), offset=offset)
         self.renderer.draw_player(screen, tuple(self.player), offset=offset)
+
+        # Flash de impacto
+        if self.hit_flash_timer > 0:
+            flash = pygame.Surface((w, h), pygame.SRCALPHA)
+            alpha = 120 if self.hit_flash_timer > self.hit_flash_duration//2 else 60
+            flash.fill((255, 0, 0, alpha))
+            screen.blit(flash, (0, 0))
+
         if self.font_hud is None:
             self.font_hud = pygame.font.SysFont(None, 28)
         hud_text = f"Vidas: {self.lives}   Puntaje: {self.score}   Estrellas: {len(self.stars)}   Intentos: {self.attempts}"
