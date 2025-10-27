@@ -35,7 +35,7 @@ class GameEngine:
         
         # Estado de confirmación
         self.confirming_exit = False
-        self.pending_player_name = "SULA"
+        self.pending_player_name = ""
         
         # Cargar nivel 1
         self.level_loaded = self.bootstrap.load_levels()
@@ -68,14 +68,14 @@ class GameEngine:
                                 self.state.change_state(GameState.HALL_OF_FAME, force=True)
                             elif opcion == "ADMINISTRACION":
                                 self.admin.reset_state()
-                                self.state.change_state(GameState.ADMIN, force=True)
+                                self.state.change_state(GameState.ADMINISTRATION, force=True)
                             elif opcion == "SALIR":
                                 self.confirm_dialog = ConfirmDialog(self.screen, "Salir del juego?")
                                 self.confirming_exit = True
                     
                     elif self.state.current_state == GameState.NAME_INPUT:
                         result = self.name_input.handle_event(e)
-                        if result in ["CONFIRM", "CONFIRM_DEFAULT"]:
+                        if result == "CONFIRM":
                             self.pending_player_name = self.name_input.get_name()
                             self.bootstrap.set_player_name(self.pending_player_name)
                             self.state.change_state(GameState.PLAYING, force=True)
@@ -94,7 +94,7 @@ class GameEngine:
                         if action == "BACK":
                             self.state.change_state(GameState.MENU, force=True)
                     
-                    elif self.state.current_state == GameState.ADMIN:
+                    elif self.state.current_state == GameState.ADMINISTRATION:
                         result = self.admin.handle_event(e)
                         if result in ["CANCEL", "ACCESS_DENIED", "BACK"]:
                             self.state.change_state(GameState.MENU, force=True)
@@ -118,7 +118,7 @@ class GameEngine:
                 self.bootstrap.render(self.screen)
             elif self.state.current_state == GameState.HALL_OF_FAME:
                 self.hof.render()
-            elif self.state.current_state == GameState.ADMIN:
+            elif self.state.current_state == GameState.ADMINISTRATION:
                 self.admin.render()
             
             # Overlay de confirmación
