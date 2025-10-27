@@ -14,7 +14,7 @@ from datetime import datetime
 class GameState(Enum):
     """Estados posibles del juego"""
     MENU = auto()
-    NAME_INPUT = auto()  # Nuevo estado para captura de nombre
+    NAME_INPUT = auto()
     PLAYING = auto()
     PAUSED = auto()
     GAME_OVER = auto()
@@ -47,10 +47,9 @@ class GameStateManager:
     def __init__(self, initial_state: GameState = GameState.MENU):
         self.current_state = initial_state
         self.previous_state = None
-        self.state_stack = [initial_state]  # Para manejar estados temporales
+        self.state_stack = [initial_state]
         self.game_data = GameData()
         
-        # Transiciones válidas entre estados
         self.valid_transitions: Dict[GameState, list[GameState]] = {
             GameState.MENU: [
                 GameState.NAME_INPUT,
@@ -91,11 +90,9 @@ class GameStateManager:
             ]
         }
         
-        # Callbacks para entrada y salida de estados
         self.on_enter_callbacks: Dict[GameState, list[Callable]] = {}
         self.on_exit_callbacks: Dict[GameState, list[Callable]] = {}
         
-        # Inicializar callbacks
         for state in GameState:
             self.on_enter_callbacks[state] = []
             self.on_exit_callbacks[state] = []
@@ -112,21 +109,15 @@ class GameStateManager:
             True si el cambio fue exitoso, False si no
         """
         if not force and not self.is_valid_transition(new_state):
-            print(f"⚠️  Transición inválida: {self.current_state.name} -> {new_state.name}")
             return False
         
-        print(f"🔄 Cambiando estado: {self.current_state.name} -> {new_state.name}")
-        
-        # Ejecutar callbacks de salida del estado actual
         for callback in self.on_exit_callbacks[self.current_state]:
             callback()
         
-        # Cambiar estado
         self.previous_state = self.current_state
         self.current_state = new_state
         self.state_stack.append(new_state)
         
-        # Ejecutar callbacks de entrada del nuevo estado
         for callback in self.on_enter_callbacks[self.current_state]:
             callback()
         
@@ -150,8 +141,8 @@ class GameStateManager:
         Regresa al estado anterior en la pila
         """
         if len(self.state_stack) > 1:
-            self.state_stack.pop()  # Remover estado actual
-            previous_state = self.state_stack[-1]  # Obtener el anterior
+            self.state_stack.pop()
+            previous_state = self.state_stack[-1]
             return self.change_state(previous_state, force=True)
         return False
     
@@ -167,7 +158,6 @@ class GameStateManager:
         """Reinicia los datos del juego"""
         self.game_data = GameData()
         self.game_data.game_started_at = datetime.now()
-        print("🔄 Datos del juego reiniciados")
     
     def start_new_game(self, player_name: str = "Jugador") -> None:
         """Inicia un nuevo juego"""
@@ -176,7 +166,6 @@ class GameStateManager:
         self.game_data.lives = 3
         self.game_data.score = 0
         self.change_state(GameState.PLAYING)
-        print(f"🎮 Nuevo juego iniciado para: {player_name}")
     
     def end_game(self, final_score: int) -> None:
         """Termina el juego actual"""
@@ -186,7 +175,6 @@ class GameStateManager:
         
         self.game_data.score = final_score
         self.change_state(GameState.GAME_OVER)
-        print(f"🏁 Juego terminado - Puntuación: {final_score}")
     
     def pause_game(self) -> bool:
         """Pausa el juego si está jugando"""
