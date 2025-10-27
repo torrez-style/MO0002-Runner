@@ -1,5 +1,5 @@
 """
-Menú principal (placeholder mínimo)
+Menú principal centrado horizontalmente
 """
 import pygame
 from config.settings import settings
@@ -20,19 +20,22 @@ class MenuPrincipal:
             elif event.key == pygame.K_DOWN:
                 self.index = (self.index + 1) % len(self.options)
             elif event.key == pygame.K_RETURN:
-                # Publicar eventos en siguientes iteraciones
                 pass
 
     def update(self, delta_time: float):
         pass
 
     def render(self):
+        w, h = self.screen.get_size()
         self.screen.fill((0, 0, 0))
-        title = self.font_title.render("Maze Runner", True, (255, 255, 255))
-        self.screen.blit(title, (60, 60))
-        y = 160
+        title_surf = self.font_title.render("Maze Runner", True, (255, 255, 255))
+        title_x = (w - title_surf.get_width()) // 2
+        self.screen.blit(title_surf, (title_x, int(h*0.15)))
+        start_y = int(h*0.35)
+        spacing = 48
         for i, opt in enumerate(self.options):
             color = (255, 255, 0) if i == self.index else (200, 200, 200)
             surf = self.font_opt.render(opt, True, color)
-            self.screen.blit(surf, (60, y))
-            y += 48
+            x = (w - surf.get_width()) // 2
+            y = start_y + i * spacing
+            self.screen.blit(surf, (x, y))
