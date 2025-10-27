@@ -11,19 +11,27 @@ class AdminView:
         self.font_title = pygame.font.SysFont(None, 48)
         self.font_text = pygame.font.SysFont(None, 32)
         self.font_hint = pygame.font.SysFont(None, 24)
-        self.state = "PASSWORD"  # PASSWORD, MENU
+        self.state = "PASSWORD"  # PASSWORD, MENU, CONFIRM_RESET
         self.password = ""
         self.attempts = 0
         self.max_attempts = 3
         self.menu_index = 0
-        self.menu_options = ["Reset Salon de la Fama", "Toggle Sonidos", "Listar Laberintos", "Salir"]
+        self.menu_options = [
+            "Reset Salon de la Fama",
+            "Toggle Sonidos",
+            "Listar Laberintos",
+            "Salir"
+        ]
         self.bg_color = (40, 0, 0)
+        self.confirm_yes = True
     
     def handle_event(self, event):
         if self.state == "PASSWORD":
             return self._handle_password_event(event)
         elif self.state == "MENU":
             return self._handle_menu_event(event)
+        elif self.state == "CONFIRM_RESET":
+            return self._handle_confirm_reset_event(event)
         return None
     
     def _handle_password_event(self, event):
@@ -57,11 +65,28 @@ class AdminView:
                 return "BACK"
         return None
     
+    def _handle_confirm_reset_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                self.confirm_yes = not self.confirm_yes
+            elif event.key == pygame.K_RETURN:
+                if self.confirm_yes:
+                    save_json(SCORES_FILE, [])
+                    self.state = "MENU"
+                    return "HALL_RESET"
+                else:
+                    self.state = "MENU"
+                    return None
+            elif event.key == pygame.K_ESCAPE:
+                self.state = "MENU"
+                return None
+        return None
+    
     def _execute_menu_option(self):
         option = self.menu_options[self.menu_index]
         if option == "Reset Salon de la Fama":
-            save_json(SCORES_FILE, [])
-            return "HALL_RESET"
+            self.state = "CONFIRM_RESET"
+            return None
         elif option == "Toggle Sonidos":
             sound_manager.toggle_sounds()
             return "SOUNDS_TOGGLED"
@@ -107,9 +132,13 @@ class AdminView:
             status = f"Sonidos: {'ON' if sound_manager.enabled else 'OFF'}"
             status_surf = self.font_hint.render(status, True, (150, 150, 255))
             self.screen.blit(status_surf, (20, h-30))
-    
-    def reset_state(self):
-        self.state = "PASSWORD"
-        self.password = ""
-        self.attempts = 0
-        self.menu_index = 0
+        
+        elif self.state == "CONFIRM_RESET":
+            title = self.font_title.render("Eliminar Salon de la Fama?", True, (255, 255, 255))
+            self.screen.blit(title, ((w - title.get_width())//2, int(h*0.30)))
+            
+            opt_yes = self.font_text.render("SI", True, (255, 255, 0) if self.confirm_yes else (200,200,200))
+            opt_no = self.font_text.render("NO", True, (255, 255, 0) if not self.confirm_yes else (200,200,200))
+            
+            self.screen.blit(opt_yes, (w//2 - 60, int(h*0.55)))
+            self.screen.blit(opt_no, (w//2 + 20, int(h*0.55)))
