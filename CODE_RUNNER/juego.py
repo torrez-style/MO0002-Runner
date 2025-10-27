@@ -93,7 +93,6 @@ class Juego:
         return random.choice(libres) if libres else (1,1)
 
     def _recolocar_enemigos_si_vacios(self, lvl):
-        # Si no hay enemigos (por bajas sucesivas o errores), volver a generarlos al menos 1
         if not self.enemigos:
             excl=[(self.pos_x,self.pos_y)]+self.estrellas
             self.enemigos=self._generar_posiciones_validas(self.LABERINTO, max(1, lvl.get("enemigos",1)), excl)
@@ -106,7 +105,7 @@ class Juego:
         exclus=[self.pos_x,self.pos_y]
         estrellas_objetivo = 3
         self.estrellas=self._generar_posiciones_validas(self.LABERINTO,estrellas_objetivo,exclus)
-        self.enemigos=self._generar_posiciones_validas(self.LABERINITO if False else self.LABERINTO,max(1,lvl.get("enemigos",1)),exclus+self.estrellas)
+        self.enemigos=self._generar_posiciones_validas(self.LABERINTO,max(1,lvl.get("enemigos",1)),exclus+self.estrellas)
         self.powerups=self._generar_posiciones_validas(self.LABERINTO,lvl.get("powerups",1),exclus+self.estrellas+self.enemigos)
         self._recolocar_enemigos_si_vacios(lvl)
         self.vidas=3; self.contador_frames=0; self.powerup_activo=None; self.powerup_timer=0; self.texto_mensaje=""; self.mensaje_frames=0
@@ -175,7 +174,6 @@ class Juego:
                 j=self.j; j.vidas-=1
                 if j.vidas>0:
                     j.pos_x,j.pos_y=j._jugador_celda_libre()
-                    # Asegurar que haya enemigos tras morir
                     j._recolocar_enemigos_si_vacios(j.niveles[j.nivel_actual])
                 else: j._estado_cambiar_a_game_over()
         class ManejadorEstrellas:
@@ -285,4 +283,3 @@ class Juego:
             with open(path, "r", encoding="utf-8") as f: txt=f.read().strip(); return json.loads(txt) if txt else (default if default is not None else [])
         except json.JSONDecodeError:
             return default if default is not None else []
-}
