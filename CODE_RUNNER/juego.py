@@ -92,23 +92,27 @@ class Juego:
         libres=[(x,y) for y in range(1,len(self.LABERINTO)-1) for x in range(1,len(self.LABERINTO[0])-1) if self.LABERINTO[y][x]==0 and (x,y) not in self.enemigos]
         return random.choice(libres) if libres else (1,1)
 
+    def _recolocar_enemigos_si_vacios(self, lvl):
+        # Si no hay enemigos (por bajas sucesivas o errores), volver a generarlos al menos 1
+        if not self.enemigos:
+            excl=[(self.pos_x,self.pos_y)]+self.estrellas
+            self.enemigos=self._generar_posiciones_validas(self.LABERINTO, max(1, lvl.get("enemigos",1)), excl)
+
     def _reiniciar_juego(self):
         if self.nivel_actual>=len(self.niveles): self.nivel_actual=0
         lvl=self.niveles[self.nivel_actual]
         self.LABERINTO=[[0 if c in (2,3) else c for c in fila] for fila in lvl["laberinto"]]
         self.pos_x,self.pos_y=self._jugador_celda_libre()
         exclus=[self.pos_x,self.pos_y]
-        # Forzar exactamente 3 estrellas por nivel
         estrellas_objetivo = 3
         self.estrellas=self._generar_posiciones_validas(self.LABERINTO,estrellas_objetivo,exclus)
-        self.enemigos=self._generar_posiciones_validas(self.LABERINTO,max(1,lvl.get("enemigos",2)),exclus+self.estrellas)
+        self.enemigos=self._generar_posiciones_validas(self.LABERINITO if False else self.LABERINTO,max(1,lvl.get("enemigos",1)),exclus+self.estrellas)
         self.powerups=self._generar_posiciones_validas(self.LABERINTO,lvl.get("powerups",1),exclus+self.estrellas+self.enemigos)
+        self._recolocar_enemigos_si_vacios(lvl)
         self.vidas=3; self.contador_frames=0; self.powerup_activo=None; self.powerup_timer=0; self.texto_mensaje=""; self.mensaje_frames=0
 
     def _avanzar_nivel(self):
-        # Regla estricta: solo avanzar si NO quedan estrellas
         if len(self.estrellas)>0:
-            # Feedback opcional en HUD
             self.texto_mensaje=f"Faltan {len(self.estrellas)} estrella(s)"; self.mensaje_frames=60
             return
         if self.nivel_actual < len(self.niveles)-1:
@@ -151,10 +155,8 @@ class Juego:
                 j.contador_frames=0
                 nuevos,ocup=[],set()
                 for ex,ey in j.enemigos:
-                    # Persecución BFS con fallback a movimiento hacia jugador si no hay camino directo
                     paso=bfs_siguiente_paso(j.LABERINTO,(ex,ey),(j.pos_x,j.pos_y)) if j.powerup_activo!='invisible' else None
                     if not paso:
-                        # Heurística Manhattan: mover hacia el jugador priorizando eje dominante
                         dx = 1 if j.pos_x>ex else -1 if j.pos_x<ex else 0
                         dy = 1 if j.pos_y>ey else -1 if j.pos_y<ey else 0
                         candidatos=[(ex+dx,ey),(ex,ey+dy),(ex+dx,ey+dy),(ex-dx,ey),(ex,ey-dy)]
@@ -171,7 +173,10 @@ class Juego:
             def __init__(self,juego,mgr): self.j=juego; mgr.registrar(EventoColisionEnemigo,self)
             def notificar(self,e):
                 j=self.j; j.vidas-=1
-                if j.vidas>0: j.pos_x,j.pos_y=j._jugador_celda_libre()
+                if j.vidas>0:
+                    j.pos_x,j.pos_y=j._jugador_celda_libre()
+                    # Asegurar que haya enemigos tras morir
+                    j._recolocar_enemigos_si_vacios(j.niveles[j.nivel_actual])
                 else: j._estado_cambiar_a_game_over()
         class ManejadorEstrellas:
             def __init__(self,juego,mgr): self.j=juego; mgr.registrar(EventoRecogerEstrella,self)
@@ -246,7 +251,6 @@ class Juego:
                 for sx,sy in self.estrellas: self.vista.dibujar_estrella(sx*self.tam_celda,sy*self.tam_celda,self.tam_celda)
                 for px,py in self.powerups: self.vista.dibujar_powerup(px*self.tam_celda,py*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_jugador(self.pos_x*self.tam_celda,self.pos_y*self.tam_celda,self.tam_celda)
-                # Mostrar HUD con estrellas restantes
                 self.vista.dibujar_hud(self.vidas,self.puntuacion)
                 self.vista.dibujar_texto(f"Estrellas restantes: {len(self.estrellas)}", 20, 20, 24, (255,255,0))
                 if self.texto_mensaje and self.mensaje_frames>0: self.vista.dibujar_texto(self.texto_mensaje, 120, 60, 32, (255,64,64))
@@ -281,3 +285,4 @@ class Juego:
             with open(path, "r", encoding="utf-8") as f: txt=f.read().strip(); return json.loads(txt) if txt else (default if default is not None else [])
         except json.JSONDecodeError:
             return default if default is not None else []
+}
