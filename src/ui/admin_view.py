@@ -1,5 +1,5 @@
 """
-Pantalla de administración con contraseña y utilidades
+Pantalla de administración con contraseña y utilidades (textos en español)
 """
 import pygame
 from src.data.file_manager import load_json, save_json, SCORES_FILE
@@ -17,10 +17,10 @@ class AdminView:
         self.max_attempts = 3
         self.menu_index = 0
         self.menu_options = [
-            "Reset Salon de la Fama",
-            "Toggle Sonidos",
-            "Listar Laberintos",
-            "Salir"
+            "ELIMINAR SALON DE LA FAMA",
+            "ALTERNAR SONIDOS",
+            "LISTAR LABERINTOS",
+            "SALIR"
         ]
         self.bg_color = (40, 0, 0)
         self.confirm_yes = True
@@ -91,15 +91,15 @@ class AdminView:
     
     def _execute_menu_option(self):
         option = self.menu_options[self.menu_index]
-        if option == "Reset Salon de la Fama":
+        if option == "ELIMINAR SALON DE LA FAMA":
             self.state = "CONFIRM_RESET"
             return None
-        elif option == "Toggle Sonidos":
+        elif option == "ALTERNAR SONIDOS":
             sound_manager.toggle_sounds()
             return "SOUNDS_TOGGLED"
-        elif option == "Listar Laberintos":
+        elif option == "LISTAR LABERINTOS":
             return "LIST_LEVELS"
-        elif option == "Salir":
+        elif option == "SALIR":
             return "BACK"
         return None
     
@@ -111,7 +111,7 @@ class AdminView:
             title = self.font_title.render("ADMINISTRACION", True, (255, 255, 255))
             self.screen.blit(title, ((w - title.get_width())//2, int(h*0.20)))
             
-            prompt = self.font_text.render("Ingrese contraseña:", True, (255, 255, 255))
+            prompt = self.font_text.render("INGRESE CONTRASENA:", True, (255, 255, 255))
             self.screen.blit(prompt, ((w - prompt.get_width())//2, int(h*0.40)))
             
             pwd_display = "*" * len(self.password)
@@ -119,10 +119,10 @@ class AdminView:
             self.screen.blit(pwd_surf, ((w - pwd_surf.get_width())//2, int(h*0.50)))
             
             if self.attempts > 0:
-                error = self.font_hint.render(f"Contraseña incorrecta ({self.attempts}/{self.max_attempts})", True, (255, 100, 100))
+                error = self.font_hint.render(f"CONTRASENA INCORRECTA ({self.attempts}/{self.max_attempts})", True, (255, 100, 100))
                 self.screen.blit(error, ((w - error.get_width())//2, int(h*0.60)))
             
-            hint = self.font_hint.render("ENTER: Confirmar | ESC: Cancelar", True, (200, 200, 200))
+            hint = self.font_hint.render("ENTER: CONFIRMAR | ESC: CANCELAR", True, (200, 200, 200))
             self.screen.blit(hint, ((w - hint.get_width())//2, int(h*0.75)))
         
         elif self.state == "MENU":
@@ -136,12 +136,12 @@ class AdminView:
                 self.screen.blit(surf, ((w - surf.get_width())//2, y))
                 y += 40
             
-            status = f"Sonidos: {'ON' if sound_manager.enabled else 'OFF'}"
+            status = f"SONIDOS: {'ACTIVADO' if sound_manager.enabled else 'DESACTIVADO'}"
             status_surf = self.font_hint.render(status, True, (150, 150, 255))
             self.screen.blit(status_surf, (20, h-30))
         
         elif self.state == "CONFIRM_RESET":
-            title = self.font_title.render("Eliminar Salon de la Fama?", True, (255, 255, 255))
+            title = self.font_title.render("ELIMINAR SALON DE LA FAMA?", True, (255, 255, 255))
             self.screen.blit(title, ((w - title.get_width())//2, int(h*0.30)))
             
             opt_yes = self.font_text.render("SI", True, (255, 255, 0) if self.confirm_yes else (200,200,200))
