@@ -1,5 +1,5 @@
 """
-Motor del juego: añade estado HALL_OF_FAME y navegación con ESC
+Motor del juego: navegación correcta desde menú según opción seleccionada
 """
 import pygame
 from config.settings import settings
@@ -39,13 +39,16 @@ class GameEngine:
                     if self.state.current_state == GameState.MENU:
                         self.menu.handle_event(e)
                         if e.type == pygame.KEYDOWN and e.key == pygame.K_RETURN:
-                            # Enter en menú principal: si está en "SALON..." no hay selección aún, 
-                            # se activará con flechas + ENTER en siguientes iteraciones.
-                            # De momento, ENTER empieza a jugar.
-                            self.state.change_state(GameState.PLAYING, force=True)
-                        # Abrir Salón con tecla S como acceso rápido por ahora
-                        if e.type == pygame.KEYDOWN and e.key == pygame.K_s:
-                            self.state.change_state(GameState.HALL_OF_FAME, force=True)
+                            opcion = self.menu.options[self.menu.index]
+                            if opcion == "JUGAR":
+                                self.state.change_state(GameState.PLAYING, force=True)
+                            elif opcion == "SALON DE LA FAMA":
+                                self.state.change_state(GameState.HALL_OF_FAME, force=True)
+                            elif opcion == "ADMINISTRACION":
+                                # futuro: estado de administración
+                                pass
+                            elif opcion == "SALIR":
+                                running = False
                     elif self.state.current_state == GameState.PLAYING:
                         if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                             self.state.change_state(GameState.MENU, force=True)
