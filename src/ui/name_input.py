@@ -1,5 +1,5 @@
 """
-Pantalla de entrada de nombre del jugador con validación de duplicados
+Pantalla de entrada de nombre del jugador (nombre obligatorio, sin valor por defecto)
 """
 import pygame
 from src.data.file_manager import load_json, SCORES_FILE
@@ -18,11 +18,14 @@ class NameInputView:
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
-                candidate = self.name.strip() if self.name.strip() else "SULA"
+                candidate = self.name.strip()
+                if not candidate:
+                    self.error_msg = "Ingrese un nombre válido"
+                    return None
                 if self._name_exists(candidate):
                     self.error_msg = "Nombre ya registrado, ingrese otro"
                     return None
-                return "CONFIRM" if self.name.strip() else "CONFIRM_DEFAULT"
+                return "CONFIRM"
             elif event.key == pygame.K_ESCAPE:
                 return "CANCEL"
             elif event.key == pygame.K_BACKSPACE:
@@ -51,7 +54,7 @@ class NameInputView:
         title = self.font_title.render("Ingrese su nombre", True, (255, 255, 255))
         self.screen.blit(title, ((w - title.get_width())//2, int(h*0.25)))
         
-        display_name = self.name if self.name else "SULA"
+        display_name = self.name if self.name else ""
         cursor = "_" if (self.cursor_timer // 30) % 2 == 0 else " "
         text_surf = self.font_text.render(display_name + cursor, True, (255, 255, 100))
         self.screen.blit(text_surf, ((w - text_surf.get_width())//2, int(h*0.45)))
@@ -62,10 +65,8 @@ class NameInputView:
         
         hint1 = self.font_hint.render("ENTER: Confirmar", True, (200, 200, 200))
         hint2 = self.font_hint.render("ESC: Cancelar", True, (200, 200, 200))
-        hint3 = self.font_hint.render("(Vacio usa SULA por defecto)", True, (160, 160, 160))
         self.screen.blit(hint1, ((w - hint1.get_width())//2, int(h*0.70)))
         self.screen.blit(hint2, ((w - hint2.get_width())//2, int(h*0.75)))
-        self.screen.blit(hint3, ((w - hint3.get_width())//2, int(h*0.80)))
     
     def get_name(self):
-        return self.name.strip() if self.name.strip() else "SULA"
+        return self.name.strip()
