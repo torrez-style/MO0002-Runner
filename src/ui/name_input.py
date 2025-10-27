@@ -18,12 +18,12 @@ class NameInputView:
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
-                candidate = self.name.strip()
+                candidate = self.name.strip().upper()
                 if not candidate:
-                    self.error_msg = "Ingrese un nombre válido"
+                    self.error_msg = "INGRESE UN NOMBRE VALIDO"
                     return None
                 if self._name_exists(candidate):
-                    self.error_msg = "Nombre ya registrado, ingrese otro"
+                    self.error_msg = "NOMBRE YA REGISTRADO, INGRESE OTRO"
                     return None
                 return "CONFIRM"
             elif event.key == pygame.K_ESCAPE:
@@ -38,9 +38,9 @@ class NameInputView:
         scores = load_json(SCORES_FILE, [])
         if not isinstance(scores, list):
             return False
-        normalized = candidate.strip().lower()
+        normalized = candidate.strip().upper()
         for s in scores:
-            if str(s.get("nombre", "")).strip().lower() == normalized:
+            if str(s.get("nombre", "")).strip().upper() == normalized:
                 return True
         return False
     
@@ -51,10 +51,10 @@ class NameInputView:
         w, h = self.screen.get_size()
         self.screen.fill(self.bg_color)
         
-        title = self.font_title.render("Ingrese su nombre", True, (255, 255, 255))
+        title = self.font_title.render("INGRESE SU NOMBRE", True, (255, 255, 255))
         self.screen.blit(title, ((w - title.get_width())//2, int(h*0.25)))
         
-        display_name = self.name if self.name else ""
+        display_name = self.name.upper() if self.name else ""
         cursor = "_" if (self.cursor_timer // 30) % 2 == 0 else " "
         text_surf = self.font_text.render(display_name + cursor, True, (255, 255, 100))
         self.screen.blit(text_surf, ((w - text_surf.get_width())//2, int(h*0.45)))
@@ -63,10 +63,10 @@ class NameInputView:
             err = self.font_hint.render(self.error_msg, True, (255, 120, 120))
             self.screen.blit(err, ((w - err.get_width())//2, int(h*0.55)))
         
-        hint1 = self.font_hint.render("ENTER: Confirmar", True, (200, 200, 200))
-        hint2 = self.font_hint.render("ESC: Cancelar", True, (200, 200, 200))
+        hint1 = self.font_hint.render("ENTER: CONFIRMAR", True, (200, 200, 200))
+        hint2 = self.font_hint.render("ESC: CANCELAR", True, (200, 200, 200))
         self.screen.blit(hint1, ((w - hint1.get_width())//2, int(h*0.70)))
         self.screen.blit(hint2, ((w - hint2.get_width())//2, int(h*0.75)))
     
     def get_name(self):
-        return self.name.strip()
+        return self.name.strip().upper()
