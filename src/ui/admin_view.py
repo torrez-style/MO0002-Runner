@@ -24,6 +24,13 @@ class AdminView:
         ]
         self.bg_color = (40, 0, 0)
         self.confirm_yes = True
+
+    def reset_state(self):
+        self.state = "PASSWORD"
+        self.password = ""
+        self.attempts = 0
+        self.menu_index = 0
+        self.confirm_yes = True
     
     def handle_event(self, event):
         if self.state == "PASSWORD":
