@@ -32,14 +32,14 @@ try:
     from config.settings import settings
     
 except ImportError as e:
-    print(f"❌ Error de importación: {e}")
-    print("\n¿Posibles soluciones:")
+    print(f"ERROR de importación: {e}")
+    print("\nPosibles soluciones:")
     print("1. Instalar dependencias: pip install -r requirements.txt")
     print("2. Verificar que está en el directorio correcto del proyecto")
     print("3. Verificar instalación de Python")
     sys.exit(1)
 except Exception as e:
-    print(f"❌ Error inesperado durante la importación: {e}")
+    print(f"ERROR inesperado durante la importación: {e}")
     traceback.print_exc()
     sys.exit(1)
 
@@ -54,38 +54,38 @@ def check_system_requirements() -> bool:
     try:
         # Verificar pygame
         pygame_version = pygame.version.ver
-        print(f"✓ Pygame versión: {pygame_version}")
+        print(f"Pygame versión: {pygame_version}")
         
         # Verificar inicialización de video
         pygame.init()
         if not pygame.get_init():
-            print("❌ No se pudo inicializar Pygame")
+            print("No se pudo inicializar Pygame")
             return False
         
         # Verificar capacidades de video
         try:
-            test_surface = pygame.display.set_mode((1, 1))
+            _ = pygame.display.set_mode((1, 1))
             pygame.display.quit()
-            print("✓ Sistema de video disponible")
+            print("Sistema de video disponible")
         except pygame.error:
-            print("❌ Sistema de video no disponible")
+            print("Sistema de video no disponible")
             return False
         
         # Verificar capacidades de audio
         try:
             pygame.mixer.init()
             if pygame.mixer.get_init():
-                print("✓ Sistema de audio disponible")
+                print("Sistema de audio disponible")
                 pygame.mixer.quit()
             else:
-                print("⚠️  Sistema de audio no disponible (el juego continuará sin sonido)")
+                print("Sistema de audio no disponible (el juego continuará sin sonido)")
         except pygame.error:
-            print("⚠️  Sistema de audio no disponible (el juego continuará sin sonido)")
+            print("Sistema de audio no disponible (el juego continuará sin sonido)")
         
         return True
         
     except Exception as e:
-        print(f"❌ Error verificando requisitos del sistema: {e}")
+        print(f"Error verificando requisitos del sistema: {e}")
         return False
 
 
@@ -106,9 +106,9 @@ def create_required_directories() -> None:
         if not path.exists():
             try:
                 path.mkdir(parents=True, exist_ok=True)
-                print(f"📁 Directorio creado: {dir_path}")
+                print(f"Directorio creado: {dir_path}")
             except OSError as e:
-                print(f"⚠️  No se pudo crear directorio {dir_path}: {e}")
+                print(f"No se pudo crear directorio {dir_path}: {e}")
 
 
 def setup_logging() -> None:
@@ -145,28 +145,28 @@ def display_welcome_message() -> None:
     """
     welcome_art = """
 ╔══════════════════════════════════════════════╗
-║            🎮 MAZE RUNNER 🎮                    ║
+║                MAZE RUNNER                   ║
 ╠══════════════════════════════════════════════╣
-║  MO0002 - Programación I                        ║
-║  Universidad de Costa Rica - Sede de Occidente     ║
-║  Segundo Ciclo 2025                               ║
+║  MO0002 - Programación I                     ║
+║  Universidad de Costa Rica - Sede de Occidente║
+║  Segundo Ciclo 2025                          ║
 ╠══════════════════════════════════════════════╣
-║  Autores:                                         ║
-║  • Wendy Ulate Gutierrez                         ║
-║  • Manyel Lizandro Torrez                        ║
-║  • Luis Alberto Álvarez Gómez                    ║
-║  • Kendall Alvarado Artavia                      ║
+║  Autores:                                    ║
+║  • Wendy Ulate Gutierrez                     ║
+║  • Manyel Lizandro Torrez                    ║
+║  • Luis Alberto Álvarez Gómez                ║
+║  • Kendall Alvarado Artavia                  ║
 ╠══════════════════════════════════════════════╣
-║  Profesor: Lic. Manfred Mejías Acevedo             ║
+║  Profesor: Lic. Manfred Mejías Acevedo       ║
 ╚══════════════════════════════════════════════╝
     """
     
     print(welcome_art)
-    print(f"\n🔄 Versión del juego: 2.0.0")
-    print(f"🐍 Python: {sys.version.split()[0]}")
-    print(f"🎮 Pygame: {pygame.version.ver}")
-    print(f"🖥️  Resolución: {settings.SCREEN_WIDTH}x{settings.SCREEN_HEIGHT}")
-    print(f"⏱️  FPS objetivo: {settings.FPS}")
+    print(f"Version del juego: 2.0.0")
+    print(f"Python: {sys.version.split()[0]}")
+    print(f"Pygame: {pygame.version.ver}")
+    print(f"Resolucion: {settings.SCREEN_WIDTH}x{settings.SCREEN_HEIGHT}")
+    print(f"FPS objetivo: {settings.FPS}")
     print()
 
 
@@ -177,20 +177,20 @@ def handle_startup_error(error: Exception) -> None:
     Args:
         error: Excepción que ocurrió
     """
-    print(f"\n❌ ERROR DURANTE EL INICIO: {error}")
-    print("\n🔍 Información de debugging:")
+    print(f"\nERROR DURANTE EL INICIO: {error}")
+    print("\nInformación de debugging:")
     print("-" * 50)
     traceback.print_exc()
     print("-" * 50)
     
-    print("\n🛠️  Posibles soluciones:")
+    print("\nPosibles soluciones:")
     print("1. Verificar instalación de dependencias: pip install -r requirements.txt")
     print("2. Verificar permisos de escritura en el directorio")
     print("3. Verificar drivers de video/audio del sistema")
     print("4. Ejecutar desde el directorio raíz del proyecto")
     print("5. Verificar compatibilidad del sistema operativo")
     
-    print("\n📞 Para soporte, contactar al equipo de desarrollo")
+    print("\nPara soporte, contactar al equipo de desarrollo")
 
 
 def main() -> int:
@@ -208,35 +208,35 @@ def main() -> int:
         setup_logging()
         
         # Verificar requisitos del sistema
-        print("🔍 Verificando requisitos del sistema...")
+        print("Verificando requisitos del sistema...")
         if not check_system_requirements():
-            print("❌ Los requisitos del sistema no se cumplen")
+            print("Los requisitos del sistema no se cumplen")
             return 1
         
         # Crear directorios necesarios
-        print("📁 Creando directorios necesarios...")
+        print("Creando directorios necesarios...")
         create_required_directories()
         
         # Inicializar y ejecutar el motor del juego
-        print("🎮 Inicializando motor del juego...")
+        print("Inicializando motor del juego...")
         game_engine = GameEngine()
         
-        print("🚀 Iniciando Maze Runner...")
+        print("Iniciando Maze Runner...")
         print("\n" + "="*50)
-        print("🕹️  Controles:")
-        print("   ⬆️ ⬇️ ⬅️ ➡️  : Mover jugador")
-        print("   ESC        : Menú principal")
-        print("   ENTER      : Seleccionar/Reiniciar")
+        print("Controles:")
+        print("   Flechas: Mover jugador")
+        print("   ESC    : Menú principal")
+        print("   ENTER  : Seleccionar/Reiniciar")
         print("="*50 + "\n")
         
         # Ejecutar juego
         game_engine.run()
         
-        print("🎯 Juego terminado exitosamente")
+        print("Juego terminado exitosamente")
         return 0
         
     except KeyboardInterrupt:
-        print("\n\n⏹️  Juego interrumpido por el usuario")
+        print("\n\nJuego interrumpido por el usuario")
         return 0
         
     except Exception as e:
@@ -250,8 +250,8 @@ def main() -> int:
         except:
             pass
         
-        print("\n👋 Gracias por jugar Maze Runner!")
-        print("🎓 Universidad de Costa Rica - Sede de Occidente")
+        print("\nGracias por jugar Maze Runner!")
+        print("Universidad de Costa Rica - Sede de Occidente")
 
 
 if __name__ == "__main__":
