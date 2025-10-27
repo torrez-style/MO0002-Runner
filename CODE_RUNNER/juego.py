@@ -108,6 +108,9 @@ class Juego:
         self.enemigos=self._generar_posiciones_validas(self.LABERINTO,max(1,lvl.get("enemigos",1)),exclus+self.estrellas)
         self.powerups=self._generar_posiciones_validas(self.LABERINTO,lvl.get("powerups",1),exclus+self.estrellas+self.enemigos)
         self._recolocar_enemigos_si_vacios(lvl)
+        # Asegurar que el HUD muestre vidas reales (no pisarlas con texto)
+        self.hud_offset_x = 20
+        self.hud_offset_y = 48  # dejar espacio para la línea de estrellas
         self.vidas=3; self.contador_frames=0; self.powerup_activo=None; self.powerup_timer=0; self.texto_mensaje=""; self.mensaje_frames=0
 
     def _avanzar_nivel(self):
@@ -249,8 +252,9 @@ class Juego:
                 for sx,sy in self.estrellas: self.vista.dibujar_estrella(sx*self.tam_celda,sy*self.tam_celda,self.tam_celda)
                 for px,py in self.powerups: self.vista.dibujar_powerup(px*self.tam_celda,py*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_jugador(self.pos_x*self.tam_celda,self.pos_y*self.tam_celda,self.tam_celda)
-                self.vista.dibujar_hud(self.vidas,self.puntuacion)
+                # HUD: mover Vidas y Estrellas para que no se sobrepongan
                 self.vista.dibujar_texto(f"Estrellas restantes: {len(self.estrellas)}", 20, 20, 24, (255,255,0))
+                self.vista.dibujar_hud(self.vidas,self.puntuacion, x=20, y=self.hud_offset_y)
                 if self.texto_mensaje and self.mensaje_frames>0: self.vista.dibujar_texto(self.texto_mensaje, 120, 60, 32, (255,64,64))
                 self.vista.actualizar()
             elif self.estado=="MENU":
