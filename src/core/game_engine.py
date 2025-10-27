@@ -1,5 +1,5 @@
 """
-Motor del juego: conecta menú, carga nivel 1 y renderiza
+Motor del juego: añade estado HALL_OF_FAME y navegación con ESC
 """
 import pygame
 from config.settings import settings
@@ -7,6 +7,7 @@ from src.core.game_state import GameStateManager, GameState
 from src.world.events import EventManager
 from src.ui.menu import MenuPrincipal
 from src.ui.game_view import GameView
+from src.ui.hall_of_fame import HallOfFameView
 from src.core.game_bootstrap import GameBootstrap
 
 class GameEngine:
@@ -21,9 +22,10 @@ class GameEngine:
         
         self.menu = MenuPrincipal(self.screen, self.events)
         self.view = GameView(self.screen, self.events)
+        self.hof = HallOfFameView(self.screen)
         self.bootstrap = GameBootstrap()
         
-        # Cargar nivel 1 al iniciar; se mostrará cuando se pase a PLAYING
+        # Cargar nivel 1 al iniciar
         self.level_loaded = self.bootstrap.load_levels()
 
     def run(self):
@@ -34,22 +36,30 @@ class GameEngine:
                 if e.type == pygame.QUIT:
                     running = False
                 else:
-                    # Manejo básico: ENTER cambia de MENU a PLAYING
                     if self.state.current_state == GameState.MENU:
                         self.menu.handle_event(e)
                         if e.type == pygame.KEYDOWN and e.key == pygame.K_RETURN:
+                            # Enter en menú principal: si está en "SALON..." no hay selección aún, 
+                            # se activará con flechas + ENTER en siguientes iteraciones.
+                            # De momento, ENTER empieza a jugar.
                             self.state.change_state(GameState.PLAYING, force=True)
+                        # Abrir Salón con tecla S como acceso rápido por ahora
+                        if e.type == pygame.KEYDOWN and e.key == pygame.K_s:
+                            self.state.change_state(GameState.HALL_OF_FAME, force=True)
                     elif self.state.current_state == GameState.PLAYING:
                         if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                             self.state.change_state(GameState.MENU, force=True)
-                        self.view.handle_event(e)
+                        self.bootstrap.handle_event(e)
+                    elif self.state.current_state == GameState.HALL_OF_FAME:
+                        action = self.hof.handle_event(e)
+                        if action == "BACK":
+                            self.state.change_state(GameState.MENU, force=True)
             
             # Update
             if self.state.current_state == GameState.MENU:
                 self.menu.update(dt)
             elif self.state.current_state == GameState.PLAYING:
                 self.bootstrap.update()
-                self.view.update(dt)
             
             # Render
             self.screen.fill((0,0,0))
@@ -57,6 +67,8 @@ class GameEngine:
                 self.menu.render()
             elif self.state.current_state == GameState.PLAYING:
                 self.bootstrap.render(self.screen)
+            elif self.state.current_state == GameState.HALL_OF_FAME:
+                self.hof.render()
             
             pygame.display.flip()
         pygame.quit()
