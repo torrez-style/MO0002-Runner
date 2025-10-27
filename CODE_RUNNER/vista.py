@@ -22,16 +22,14 @@ class Vista:
                 rx = self.offset_x + x*tam_celda
                 ry = self.offset_y + y*tam_celda
                 rect = pygame.Rect(rx, ry, tam_celda, tam_celda)
-                
-                if celda == 1:  # Pared
+                if celda == 1:
                     color = color_pared
-                elif celda == 2:  # Entrada (naranja)
+                elif celda == 2:
                     color = (255, 150, 0)
-                elif celda == 3:  # Salida (verde brillante)
+                elif celda == 3:
                     color = (0, 255, 0)
-                else:  # Suelo normal (0)
+                else:
                     color = color_suelo
-                    
                 pygame.draw.rect(self.pantalla, color, rect)
                 if dibujar_rejilla:
                     pygame.draw.rect(self.pantalla, (40,40,40), rect, 1)
@@ -46,11 +44,12 @@ class Vista:
         rect = pygame.Rect(self.offset_x + x + tam*0.25, self.offset_y + y + tam*0.25, tam*0.5, tam*0.5)
         pygame.draw.rect(self.pantalla, (255, 215, 0), rect)
 
-    def dibujar_hud(self, vidas, puntos):
+    def dibujar_hud(self, vidas, puntos, x=30, y=24):
+        # Permitir posicionamiento configurable para evitar solapamientos
         vidas_text = self.fuente_hud.render(f"Vidas: {vidas}", True, (255, 255, 255))
         puntos_text = self.fuente_hud.render(f"Puntos:  {puntos}", True, (255, 255, 255))
-        self.pantalla.blit(vidas_text, (30, 24))
-        self.pantalla.blit(puntos_text, (self.ancho - puntos_text.get_width() - 30, 24))
+        self.pantalla.blit(vidas_text, (x, y))
+        self.pantalla.blit(puntos_text, (self.ancho - puntos_text.get_width() - 30, y))
 
     def dibujar_powerup(self, x, y, tam):
         size = tam * 0.5
