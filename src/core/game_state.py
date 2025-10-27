@@ -14,6 +14,7 @@ from datetime import datetime
 class GameState(Enum):
     """Estados posibles del juego"""
     MENU = auto()
+    NAME_INPUT = auto()  # Nuevo estado para captura de nombre
     PLAYING = auto()
     PAUSED = auto()
     GAME_OVER = auto()
@@ -52,10 +53,15 @@ class GameStateManager:
         # Transiciones válidas entre estados
         self.valid_transitions: Dict[GameState, list[GameState]] = {
             GameState.MENU: [
+                GameState.NAME_INPUT,
                 GameState.PLAYING,
                 GameState.HALL_OF_FAME,
                 GameState.ADMINISTRATION,
                 GameState.LOADING
+            ],
+            GameState.NAME_INPUT: [
+                GameState.PLAYING,
+                GameState.MENU
             ],
             GameState.PLAYING: [
                 GameState.PAUSED,
