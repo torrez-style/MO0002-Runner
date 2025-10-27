@@ -3,6 +3,6 @@ Módulo Audio - Sistema de sonido
 Maneja efectos de sonido y música del juego
 """
 
-from .sound_manager import SoundManager, SoundEffect, MusicTrack, AudioSettings
+from .sound_manager import sound_manager
 
-__all__ = ['SoundManager', 'SoundEffect', 'MusicTrack', 'AudioSettings']
+__all__ = ['sound_manager']
