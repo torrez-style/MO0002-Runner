@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.entities.character import Character, Position, Direction
-from src.audio.sound_manager import SoundManager, SoundEffect
+from src.audio.sound_manager import sound_manager
 from config.settings import settings
 
 
@@ -163,6 +163,9 @@ class Player(Character):
             # Añadir puntos por movimiento
             self.add_score(settings.POINTS_PER_MOVE)
             
+            # Reproducir sonido de movimiento
+            sound_manager.play_move()
+            
             return True
         
         return False
@@ -215,6 +218,9 @@ class Player(Character):
         self._stats.stars_collected += 1
         self.add_score(settings.POINTS_PER_ITEM)
         
+        # Reproducir sonido de estrella
+        sound_manager.play_star()
+        
         # Ejecutar callbacks
         for callback in self._on_star_collected_callbacks:
             callback(self._stats.stars_collected)
@@ -232,6 +238,9 @@ class Player(Character):
         """
         if self._stats.lives > 0:
             self._stats.lives -= 1
+            
+            # Reproducir sonido de daño
+            sound_manager.play_hit()
             
             # Ejecutar callbacks
             for callback in self._on_life_lost_callbacks:
@@ -323,7 +332,7 @@ class Player(Character):
     
     def on_move(self, direction: Direction) -> None:
         """Callback ejecutado cuando el jugador se mueve"""
-        # Aquí se pueden añadir efectos de sonido
+        # Aquí se pueden añadir efectos de sonido adicionales
         pass
     
     def on_activate(self) -> None:
