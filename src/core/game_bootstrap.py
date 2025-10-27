@@ -1,5 +1,5 @@
 """
-Bootstrap: enemigos con persecución global más lenta y victoria asegurada
+Bootstrap: integra efectos de sonido y nombre dinámico del jugador
 """
 import random
 import pygame
@@ -7,8 +7,7 @@ from typing import List, Tuple
 from datetime import datetime
 from src.ui.maze_renderer import MazeRenderer
 from src.data.file_manager import load_json, save_json, SCORES_FILE
-
-PLAYER_NAME = "SULA"
+from src.audio.sound_manager import sound_manager
 
 class GameBootstrap:
     def __init__(self):
@@ -29,12 +28,17 @@ class GameBootstrap:
         self.lives = 3
         self.score = 0
         self.attempts = 1
+        self.player_name = "SULA"  # Dinámico
         # Enemigos: velocidad reducida
         self.enemy_tick = 0
-        self.enemy_delay = 16  # más lento que antes (era 8)
+        self.enemy_delay = 16
         # VFX
         self.hit_flash_timer = 0
         self.hit_flash_duration = 18
+
+    def set_player_name(self, name: str):
+        """Establece el nombre del jugador"""
+        self.player_name = name.strip() if name.strip() else "SULA"
 
     def load_levels(self, path="assets/config/levels.json"):
         data = load_json(path, {"niveles": []})
@@ -69,10 +73,8 @@ class GameBootstrap:
         return [(x,y) for y,row in enumerate(self.grid) for x,c in enumerate(row) if c==0]
 
     def _enemy_next_step_chase(self, ex, ey):
-        # Persecución global: siempre hacia el jugador, sin restricciones
         px, py = self.player
         dirs = []
-        # Priorizar eje con mayor diferencia
         if abs(px-ex) >= abs(py-ey):
             if px > ex: dirs.append((1,0))
             if px < ex: dirs.append((-1,0))
@@ -83,7 +85,6 @@ class GameBootstrap:
             if py < ey: dirs.append((0,-1))
             if px > ex: dirs.append((1,0))
             if px < ex: dirs.append((-1,0))
-        # Alternativas si está bloqueado
         for d in [(1,0),(-1,0),(0,1),(0,-1)]:
             if d not in dirs:
                 dirs.append(d)
@@ -100,6 +101,7 @@ class GameBootstrap:
         if (px, py) in self.enemies:
             self.lives -= 1
             self.hit_flash_timer = self.hit_flash_duration
+            sound_manager.play_hit()
             libres = [p for p in self._free_cells() if p not in self.enemies]
             if libres:
                 self.player[0], self.player[1] = random.choice(libres)
@@ -125,13 +127,15 @@ class GameBootstrap:
             if dx or dy:
                 nx, ny = self.player[0] + dx, self.player[1] + dy
                 if self._can_move(nx, ny):
+                    sound_manager.play_move()
                     self.player[0], self.player[1] = nx, ny
                     self.score += 1
                     if (nx, ny) in self.stars:
+                        sound_manager.play_star()
                         self.stars.remove((nx, ny))
                         self.score += 10
-                    # Victoria: sin estrellas y en salida
                     if not self.stars and (nx, ny) == self.exit:
+                        sound_manager.play_win()
                         self.score += 50
                         self.win = True
                         self._save_score()
@@ -148,7 +152,6 @@ class GameBootstrap:
             nuevos = []
             ocup = set()
             for ex, ey in self.enemies:
-                # Persecución global siempre activa
                 nx, ny = self._enemy_next_step_chase(ex, ey)
                 if (nx, ny) in ocup:
                     nx, ny = ex, ey
@@ -161,7 +164,13 @@ class GameBootstrap:
         scores = load_json(SCORES_FILE, [])
         if not isinstance(scores, list):
             scores = []
-        entry = {"nombre": PLAYER_NAME, "puntuacion": int(self.score), "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        level_name = self.level.get("nombre", "Nivel 1") if self.level else "Nivel 1"
+        entry = {
+            "nombre": self.player_name,
+            "puntuacion": int(self.score),
+            "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "laberinto": level_name
+        }
         scores.append(entry)
         scores = sorted(scores, key=lambda s: s.get("puntuacion", 0), reverse=True)[:50]
         save_json(SCORES_FILE, scores)
@@ -194,11 +203,10 @@ class GameBootstrap:
 
         if self.font_hud is None:
             self.font_hud = pygame.font.SysFont(None, 28)
-        hud_text = f"Vidas: {self.lives}   Puntaje: {self.score}   Estrellas: {len(self.stars)}   Intentos: {self.attempts}"
+        hud_text = f"Jugador: {self.player_name}   Vidas: {self.lives}   Puntaje: {self.score}   Estrellas: {len(self.stars)}   Intentos: {self.attempts}"
         hud_surf = self.font_hud.render(hud_text, True, (255,255,255))
         screen.blit(hud_surf, (20, 20))
 
-        # Overlay de victoria
         if self.win:
             overlay = pygame.Surface((w, h), pygame.SRCALPHA)
             overlay.fill((0, 120, 0, 160))
@@ -214,7 +222,6 @@ class GameBootstrap:
             screen.blit(attempts_line, ((w - attempts_line.get_width())//2, int(h*0.48)))
             screen.blit(info1, ((w - info1.get_width())//2, int(h*0.56)))
 
-        # Game Over overlay
         if self.game_over:
             overlay = pygame.Surface((w, h), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 160))
