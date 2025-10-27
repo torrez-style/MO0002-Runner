@@ -1,5 +1,6 @@
 """
-Bootstrap ampliado con IA enemiga simple, HUD de vidas/puntaje y guardado de salón de la fama
+Bootstrap con IA mejorada: patrulla aleatoria cuando no ve al jugador,
+persecución si lo ve; corrección de render del Salón de la Fama.
 """
 import random
 import pygame
@@ -29,7 +30,12 @@ class GameBootstrap:
         self.score = 0
         # Enemigos
         self.enemy_tick = 0
-        self.enemy_delay = 12
+        self.enemy_delay = 10
+        # IA: patrulla aleatoria cuando no hay línea de visión
+        self.enemy_wander_timer = 0
+        self.enemy_wander_interval = 90  # cada ~1.5s a 60 FPS cambian de rumbo
+        # Visión simple: Manhattan <= vision_range y sin pared directa en eje principal
+        self.vision_range = 8
 
     def load_levels(self, path="assets/config/levels.json"):
         data = load_json(path, {"niveles": []})
@@ -56,6 +62,8 @@ class GameBootstrap:
         self.lives = 3
         self.score = 0
         self.win = False
+        # Reset IA
+        self.enemy_wander_timer = 0
         return True
 
     def _can_move(self, x, y):
@@ -64,36 +72,60 @@ class GameBootstrap:
     def _free_cells(self):
         return [(x,y) for y,row in enumerate(self.grid) for x,c in enumerate(row) if c==0]
 
-    def _enemy_next_step(self, ex, ey):
-        # Heurística simple hacia el jugador con fallback a pasos alternos
+    def _has_line_of_sight(self, ex, ey, px, py):
+        # Visión sencilla: si están en misma fila o columna y no hay pared entre medio
+        if abs(px-ex) + abs(py-ey) > self.vision_range:
+            return False
+        if ex == px:
+            step = 1 if py > ey else -1
+            for y in range(ey+step, py, step):
+                if self.grid[y][ex] == 1:
+                    return False
+            return True
+        if ey == py:
+            step = 1 if px > ex else -1
+            for x in range(ex+step, px, step):
+                if self.grid[ey][x] == 1:
+                    return False
+            return True
+        return False
+
+    def _enemy_next_step_chase(self, ex, ey):
+        # Persecución simple hacia el jugador
         px, py = self.player
         dirs = []
         if px > ex: dirs.append((1,0))
         if px < ex: dirs.append((-1,0))
         if py > ey: dirs.append((0,1))
         if py < ey: dirs.append((0,-1))
-        # Completar con alternativas ortogonales para probar huecos
         for d in [(1,0),(-1,0),(0,1),(0,-1)]:
-            if d not in dirs: dirs.append(d)
-        # Intentar en orden
+            if d not in dirs:
+                dirs.append(d)
         for dx, dy in dirs:
             nx, ny = ex+dx, ey+dy
             if self._can_move(nx, ny) and (nx,ny) != tuple(self.player):
-                # evitar chocar con otro enemigo si es posible
-                if (nx,ny) not in self.enemies:
-                    return nx, ny
+                return nx, ny
+        return ex, ey
+
+    def _enemy_next_step_wander(self, ex, ey):
+        # Patrulla aleatoria con preferencia por continuar rumbo actual, 
+        # pero cada cierto tiempo altera dirección para evitar rebotar
+        dirs = [(1,0),(-1,0),(0,1),(0,-1)]
+        random.shuffle(dirs)
+        for dx, dy in dirs:
+            nx, ny = ex+dx, ey+dy
+            if self._can_move(nx, ny) and (nx,ny) not in self.enemies:
+                return nx, ny
         return ex, ey
 
     def _handle_enemy_collisions(self):
         # Si algún enemigo alcanza al jugador
         if tuple(self.player) in self.enemies:
             self.lives -= 1
-            # Reposicionar jugador a celda libre aleatoria
             libres = [p for p in self._free_cells() if p not in self.enemies]
             if libres:
                 self.player[0], self.player[1] = random.choice(libres)
             if self.lives <= 0:
-                # Fin de juego: guardar score y marcar win como False
                 self._save_score()
                 self.win = False
 
@@ -108,32 +140,41 @@ class GameBootstrap:
                 nx, ny = self.player[0] + dx, self.player[1] + dy
                 if self._can_move(nx, ny):
                     self.player[0], self.player[1] = nx, ny
-                    self.score += 1  # puntos por movimiento
-                    # Recolectar estrella
+                    self.score += 1
                     if (nx, ny) in self.stars:
                         self.stars.remove((nx, ny))
                         self.score += 10
-                    # Victoria: sin estrellas y en salida
                     if not self.stars and (nx, ny) == self.exit:
                         self.score += 50
                         self.win = True
                         self._save_score()
 
     def update(self):
-        # Movimiento de enemigos por tick
+        # Enemigos: alternan entre perseguir (si ven) y patrullar (si no ven)
         self.enemy_tick += 1
+        self.enemy_wander_timer += 1
         if self.enemy_tick >= self.enemy_delay:
             self.enemy_tick = 0
             nuevos = []
             ocup = set()
+            px, py = self.player
             for ex, ey in self.enemies:
-                nx, ny = self._enemy_next_step(ex, ey)
+                if self._has_line_of_sight(ex, ey, px, py):
+                    nx, ny = self._enemy_next_step_chase(ex, ey)
+                else:
+                    # cada cierto tiempo forzamos cambio aleatorio para evitar quedarse rebotando
+                    if self.enemy_wander_timer >= self.enemy_wander_interval:
+                        nx, ny = self._enemy_next_step_wander(ex, ey)
+                    else:
+                        # intentar mantener dirección hacia el jugador como preferencia, pero sin line of sight
+                        nx, ny = self._enemy_next_step_wander(ex, ey)
                 if (nx, ny) in ocup:
                     nx, ny = ex, ey
                 ocup.add((nx, ny))
                 nuevos.append((nx, ny))
             self.enemies = nuevos
-            # Colisiones
+            if self.enemy_wander_timer >= self.enemy_wander_interval:
+                self.enemy_wander_timer = 0
             self._handle_enemy_collisions()
 
     def _save_score(self):
@@ -146,7 +187,6 @@ class GameBootstrap:
             "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         scores.append(entry)
-        # Ordenar y guardar top 50 para no crecer indefinidamente
         scores = sorted(scores, key=lambda s: s.get("puntuacion", 0), reverse=True)[:50]
         save_json(SCORES_FILE, scores)
 
@@ -160,23 +200,17 @@ class GameBootstrap:
         board_h = rows * cell
         offset = ((w - board_w)//2, (h - board_h)//2)
 
-        # Dibujo del laberinto y entidades
         self.renderer.draw_maze(screen, self.grid, self.colors, offset=offset)
-        # Estrellas
         for sx, sy in self.stars:
             rect = pygame.Rect(offset[0] + sx*cell + 10, offset[1] + sy*cell + 10, cell-20, cell-20)
             pygame.draw.rect(screen, (255, 215, 0), rect)
-        # Salida
         ex, ey = self.exit
         rect_exit = pygame.Rect(offset[0] + ex*cell + 4, offset[1] + ey*cell + 4, cell-8, cell-8)
         pygame.draw.rect(screen, (0, 180, 120), rect_exit, width=2)
-        # Enemigos
         for e in self.enemies:
             self.renderer.draw_enemy(screen, e, color=tuple(self.colors.get("enemigo", (220,50,50))), offset=offset)
-        # Jugador
         self.renderer.draw_player(screen, tuple(self.player), offset=offset)
 
-        # HUD
         if self.font_hud is None:
             self.font_hud = pygame.font.SysFont(None, 28)
         hud_text = f"Vidas: {self.lives}   Puntaje: {self.score}   Estrellas: {len(self.stars)}"
