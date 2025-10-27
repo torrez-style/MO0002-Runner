@@ -1,7 +1,8 @@
 """
-Pantalla de entrada de nombre del jugador
+Pantalla de entrada de nombre del jugador con validación de duplicados
 """
 import pygame
+from src.data.file_manager import load_json, SCORES_FILE
 
 class NameInputView:
     def __init__(self, screen):
@@ -12,10 +13,15 @@ class NameInputView:
         self.name = ""
         self.cursor_timer = 0
         self.bg_color = (20, 20, 60)
-    
+        self.error_msg = ""
+        
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
+                candidate = self.name.strip() if self.name.strip() else "SULA"
+                if self._name_exists(candidate):
+                    self.error_msg = "Nombre ya registrado, ingrese otro"
+                    return None
                 return "CONFIRM" if self.name.strip() else "CONFIRM_DEFAULT"
             elif event.key == pygame.K_ESCAPE:
                 return "CANCEL"
@@ -24,6 +30,16 @@ class NameInputView:
             elif event.unicode.isprintable() and len(self.name) < 18:
                 self.name += event.unicode
         return None
+    
+    def _name_exists(self, candidate: str) -> bool:
+        scores = load_json(SCORES_FILE, [])
+        if not isinstance(scores, list):
+            return False
+        normalized = candidate.strip().lower()
+        for s in scores:
+            if str(s.get("nombre", "")).strip().lower() == normalized:
+                return True
+        return False
     
     def update(self, delta_time):
         self.cursor_timer += 1
@@ -35,19 +51,21 @@ class NameInputView:
         title = self.font_title.render("Ingrese su nombre", True, (255, 255, 255))
         self.screen.blit(title, ((w - title.get_width())//2, int(h*0.25)))
         
-        # Campo de entrada
         display_name = self.name if self.name else "SULA"
         cursor = "_" if (self.cursor_timer // 30) % 2 == 0 else " "
         text_surf = self.font_text.render(display_name + cursor, True, (255, 255, 100))
         self.screen.blit(text_surf, ((w - text_surf.get_width())//2, int(h*0.45)))
         
-        # Instrucciones
+        if self.error_msg:
+            err = self.font_hint.render(self.error_msg, True, (255, 120, 120))
+            self.screen.blit(err, ((w - err.get_width())//2, int(h*0.55)))
+        
         hint1 = self.font_hint.render("ENTER: Confirmar", True, (200, 200, 200))
         hint2 = self.font_hint.render("ESC: Cancelar", True, (200, 200, 200))
         hint3 = self.font_hint.render("(Vacio usa SULA por defecto)", True, (160, 160, 160))
-        self.screen.blit(hint1, ((w - hint1.get_width())//2, int(h*0.65)))
-        self.screen.blit(hint2, ((w - hint2.get_width())//2, int(h*0.70)))
-        self.screen.blit(hint3, ((w - hint3.get_width())//2, int(h*0.78)))
+        self.screen.blit(hint1, ((w - hint1.get_width())//2, int(h*0.70)))
+        self.screen.blit(hint2, ((w - hint2.get_width())//2, int(h*0.75)))
+        self.screen.blit(hint3, ((w - hint3.get_width())//2, int(h*0.80)))
     
     def get_name(self):
         return self.name.strip() if self.name.strip() else "SULA"
