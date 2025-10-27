@@ -28,6 +28,9 @@ class Juego:
             self.sin_niveles_cargados = False
             
         self.LABERINTO = self.niveles[0]["laberinto"]
+        # NORMALIZAR MATRIZ: Convertir 2 y 3 a 0 (eliminar entrada/salida especiales)
+        self.LABERINTO = [[0 if c in (2,3) else c for c in fila] for fila in self.LABERINTO]
+        
         self.FRAME_ENE = max(12, self.niveles[0].get("vel_enemigos", 18))
         self.tam_celda = 32
         self.pos_x = 1; self.pos_y = 1
@@ -61,7 +64,7 @@ class Juego:
             "nombre": "Nivel de Emergencia - Carga laberintos desde Administración",
             "laberinto": [
                 [1,1,1,1,1,1,1,1,1,1],
-                [1,2,0,0,0,0,0,0,3,1],
+                [1,0,0,0,0,0,0,0,0,1],
                 [1,0,1,1,1,1,1,0,0,1],
                 [1,0,0,0,0,0,0,0,1,1],
                 [1,1,1,1,1,1,1,1,1,1]
@@ -71,12 +74,11 @@ class Juego:
             "enemigos": 0,
             "powerups": 0,
             "entrada": [1, 1],
-            "salida": [8, 1],
+            "salida": [1, 1],
             "colores": {
                 "pared": [100,100,100], 
                 "suelo": [200,200,200], 
-                "enemigo": [220,50,50], 
-                "salida": [0,255,0]
+                "enemigo": [220,50,50]
             }
         }
 
@@ -108,6 +110,8 @@ class Juego:
             self.sin_niveles_cargados = False
             self.nivel_actual = 0
             self.LABERINTO = self.niveles[0]["laberinto"]
+            # NORMALIZAR MATRIZ: Convertir 2 y 3 a 0 
+            self.LABERINTO = [[0 if c in (2,3) else c for c in fila] for fila in self.LABERINTO]
             self._configurar_tablero()
             self._reiniciar_juego()
             self.vista.titulo = "Maze-Run - Nivel 1 (nuevos niveles cargados)"
@@ -155,6 +159,9 @@ class Juego:
         
         lvl = self.niveles[self.nivel_actual]
         self.LABERINTO = lvl["laberinto"]
+        # NORMALIZAR MATRIZ: Convertir 2 y 3 a 0 (eliminar entrada/salida especiales)
+        self.LABERINTO = [[0 if c in (2,3) else c for c in fila] for fila in self.LABERINTO]
+        
         self.pos_x, self.pos_y = self._jugador_celda_libre()
         exclusiones = [self.pos_x, self.pos_y]
         self.estrellas = self._generar_posiciones_validas(self.LABERINTO, lvl.get("estrellas", 3), exclusiones)
@@ -171,6 +178,8 @@ class Juego:
             self.nivel_actual += 1
             lvl = self.niveles[self.nivel_actual]
             self.LABERINTO = lvl["laberinto"]
+            # NORMALIZAR MATRIZ: Convertir 2 y 3 a 0 
+            self.LABERINTO = [[0 if c in (2,3) else c for c in fila] for fila in self.LABERINTO]
             self.FRAME_ENE = max(10, lvl.get("vel_enemigos", 12))
             self._configurar_tablero()
             self._reiniciar_juego()
@@ -194,7 +203,8 @@ class Juego:
                 elif e.direccion=='izquierda': dx=-1
                 elif e.direccion=='derecha': dx=1
                 nx,ny=j.pos_x+dx,j.pos_y+dy
-                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] == 0:
+                # PERMITIR MOVIMIENTO: Solo bloquear paredes (1), permitir todo lo demás
+                if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] != 1:
                     j.pos_x,j.pos_y=nx,ny
         
         class ManejadorPowerUps:
@@ -220,7 +230,8 @@ class Juego:
                     if not paso:
                         for dx,dy in [(0,1),(0,-1),(1,0),(-1,0)]:
                             nx,ny=ex+dx,ey+dy
-                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] == 0 and (nx,ny) not in ocup:
+                            # ENEMIGOS: Solo moverse por celdas que no sean pared (1)
+                            if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx] != 1 and (nx,ny) not in ocup:
                                 paso=(nx,ny); break
                     ex,ey=paso or (ex,ey)
                     if (ex,ey)==(j.pos_x,j.pos_y) and j.powerup_activo!='invulnerable':
