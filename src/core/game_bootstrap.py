@@ -1,5 +1,5 @@
 """
-Bootstrap: efecto visual de impacto (flash) al perder vida
+Bootstrap: IA original (persecución simple) y colisión estricta que resta vida
 """
 import random
 import pygame
@@ -25,19 +25,16 @@ class GameBootstrap:
         self.stars: List[Tuple[int,int]] = []
         self.win = False
         self.game_over = False
-        # HUD y lógica
+        # HUD
         self.lives = 3
         self.score = 0
         self.attempts = 1
         # Enemigos
         self.enemy_tick = 0
-        self.enemy_delay = 10
-        self.enemy_wander_timer = 0
-        self.enemy_wander_interval = 90
-        self.vision_range = 8
-        # Efecto visual
+        self.enemy_delay = 8   # más reactivo
+        # VFX
         self.hit_flash_timer = 0
-        self.hit_flash_duration = 18  # ~0.3s a 60 FPS
+        self.hit_flash_duration = 18
 
     def load_levels(self, path="assets/config/levels.json"):
         data = load_json(path, {"niveles": []})
@@ -50,19 +47,19 @@ class GameBootstrap:
         self.exit = tuple(self.level.get("salida", [1,1]))
         self.player = [self.entry[0], self.entry[1]]
         self.colors = self.level.get("colores", self.colors)
-        count = max(1, int(self.level.get("enemigos", 1)))
         libres = [(x,y) for y,row in enumerate(self.grid) for x,c in enumerate(row) if c==0 and (x,y)!=self.entry]
         random.shuffle(libres)
+        count = max(1, int(self.level.get("enemigos", 1)))
         self.enemies = libres[:count]
         est_count = max(1, int(self.level.get("estrellas", 3)))
         libres2 = [p for p in libres if p not in self.enemies]
         random.shuffle(libres2)
         self.stars = libres2[:est_count]
+        # Reset
         self.lives = 3
         self.score = 0
         self.win = False
         self.game_over = False
-        self.enemy_wander_timer = 0
         self.hit_flash_timer = 0
         return True
 
@@ -72,54 +69,39 @@ class GameBootstrap:
     def _free_cells(self):
         return [(x,y) for y,row in enumerate(self.grid) for x,c in enumerate(row) if c==0]
 
-    def _has_line_of_sight(self, ex, ey, px, py):
-        if abs(px-ex) + abs(py-ey) > self.vision_range:
-            return False
-        if ex == px:
-            step = 1 if py > ey else -1
-            for y in range(ey+step, py, step):
-                if self.grid[y][ex] == 1:
-                    return False
-            return True
-        if ey == py:
-            step = 1 if px > ex else -1
-            for x in range(ex+step, px, step):
-                if self.grid[ey][x] == 1:
-                    return False
-            return True
-        return False
-
     def _enemy_next_step_chase(self, ex, ey):
+        # Algoritmo original: mover un paso hacia el jugador priorizando ejes, evitando paredes
         px, py = self.player
         dirs = []
-        if px > ex: dirs.append((1,0))
-        if px < ex: dirs.append((-1,0))
-        if py > ey: dirs.append((0,1))
-        if py < ey: dirs.append((0,-1))
+        if abs(px-ex) >= abs(py-ey):
+            if px > ex: dirs.append((1,0))
+            if px < ex: dirs.append((-1,0))
+            if py > ey: dirs.append((0,1))
+            if py < ey: dirs.append((0,-1))
+        else:
+            if py > ey: dirs.append((0,1))
+            if py < ey: dirs.append((0,-1))
+            if px > ex: dirs.append((1,0))
+            if px < ex: dirs.append((-1,0))
+        # alternativas por si está bloqueado
         for d in [(1,0),(-1,0),(0,1),(0,-1)]:
             if d not in dirs:
                 dirs.append(d)
         for dx, dy in dirs:
             nx, ny = ex+dx, ey+dy
-            if self._can_move(nx, ny) and (nx,ny) != tuple(self.player):
-                return nx, ny
-        return ex, ey
-
-    def _enemy_next_step_wander(self, ex, ey):
-        dirs = [(1,0),(-1,0),(0,1),(0,-1)]
-        random.shuffle(dirs)
-        for dx, dy in dirs:
-            nx, ny = ex+dx, ey+dy
-            if self._can_move(nx, ny) and (nx,ny) not in self.enemies:
+            if self._can_move(nx, ny):
                 return nx, ny
         return ex, ey
 
     def _handle_enemy_collisions(self):
         if self.game_over:
             return
-        if tuple(self.player) in self.enemies:
+        # Colisión estricta: si cualquier enemigo está en la MISMA celda que el jugador
+        px, py = self.player
+        if (px, py) in self.enemies:
             self.lives -= 1
             self.hit_flash_timer = self.hit_flash_duration
+            # Reposicionar jugador
             libres = [p for p in self._free_cells() if p not in self.enemies]
             if libres:
                 self.player[0], self.player[1] = random.choice(libres)
@@ -162,27 +144,18 @@ class GameBootstrap:
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
         self.enemy_tick += 1
-        self.enemy_wander_timer += 1
         if self.enemy_tick >= self.enemy_delay:
             self.enemy_tick = 0
             nuevos = []
             ocup = set()
-            px, py = self.player
             for ex, ey in self.enemies:
-                if self._has_line_of_sight(ex, ey, px, py):
-                    nx, ny = self._enemy_next_step_chase(ex, ey)
-                else:
-                    if self.enemy_wander_timer >= self.enemy_wander_interval:
-                        nx, ny = self._enemy_next_step_wander(ex, ey)
-                    else:
-                        nx, ny = self._enemy_next_step_wander(ex, ey)
+                nx, ny = self._enemy_next_step_chase(ex, ey)
+                # evitar que dos enemigos terminen en la misma celda
                 if (nx, ny) in ocup:
                     nx, ny = ex, ey
                 ocup.add((nx, ny))
                 nuevos.append((nx, ny))
             self.enemies = nuevos
-            if self.enemy_wander_timer >= self.enemy_wander_interval:
-                self.enemy_wander_timer = 0
             self._handle_enemy_collisions()
 
     def _save_score(self):
@@ -207,32 +180,7 @@ class GameBootstrap:
         board_h = rows * cell
         offset = ((w - board_w)//2, (h - board_h)//2)
 
-        if self.game_over:
-            self.renderer.draw_maze(screen, self.grid, self.colors, offset=offset)
-            for sx, sy in self.stars:
-                rect = pygame.Rect(offset[0] + sx*cell + 10, offset[1] + sy*cell + 10, cell-20, cell-20)
-                pygame.draw.rect(screen, (255, 215, 0), rect)
-            for e in self.enemies:
-                self.renderer.draw_enemy(screen, e, color=tuple(self.colors.get("enemigo", (220,50,50))), offset=offset)
-            self.renderer.draw_player(screen, tuple(self.player), offset=offset)
-            overlay = pygame.Surface((w, h), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 160))
-            screen.blit(overlay, (0, 0))
-            title_font = pygame.font.SysFont(None, 72)
-            info_font = pygame.font.SysFont(None, 36)
-            title = title_font.render("PERDISTE", True, (255, 100, 100))
-            score_line = info_font.render(f"Puntaje final: {self.score}", True, (230, 230, 230))
-            attempts_line = info_font.render(f"Intentos: {self.attempts}", True, (230, 230, 230))
-            info1 = info_font.render("ENTER: Reiniciar nivel", True, (230, 230, 230))
-            info2 = info_font.render("ESC: Volver al menú", True, (230, 230, 230))
-            screen.blit(title, ((w - title.get_width())//2, int(h*0.32)))
-            screen.blit(score_line, ((w - score_line.get_width())//2, int(h*0.42)))
-            screen.blit(attempts_line, ((w - attempts_line.get_width())//2, int(h*0.48)))
-            screen.blit(info1, ((w - info1.get_width())//2, int(h*0.56)))
-            screen.blit(info2, ((w - info2.get_width())//2, int(h*0.62)))
-            return
-
-        # Render normal
+        # Tablero
         self.renderer.draw_maze(screen, self.grid, self.colors, offset=offset)
         for sx, sy in self.stars:
             rect = pygame.Rect(offset[0] + sx*cell + 10, offset[1] + sy*cell + 10, cell-20, cell-20)
@@ -251,8 +199,27 @@ class GameBootstrap:
             flash.fill((255, 0, 0, alpha))
             screen.blit(flash, (0, 0))
 
+        # HUD
         if self.font_hud is None:
             self.font_hud = pygame.font.SysFont(None, 28)
         hud_text = f"Vidas: {self.lives}   Puntaje: {self.score}   Estrellas: {len(self.stars)}   Intentos: {self.attempts}"
         hud_surf = self.font_hud.render(hud_text, True, (255,255,255))
         screen.blit(hud_surf, (20, 20))
+
+        # Game Over overlay
+        if self.game_over:
+            overlay = pygame.Surface((w, h), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 160))
+            screen.blit(overlay, (0, 0))
+            title_font = pygame.font.SysFont(None, 72)
+            info_font = pygame.font.SysFont(None, 36)
+            title = title_font.render("PERDISTE", True, (255, 100, 100))
+            score_line = info_font.render(f"Puntaje final: {self.score}", True, (230, 230, 230))
+            attempts_line = info_font.render(f"Intentos: {self.attempts}", True, (230, 230, 230))
+            info1 = info_font.render("ENTER: Reiniciar nivel", True, (230, 230, 230))
+            info2 = info_font.render("ESC: Volver al menú", True, (230, 230, 230))
+            screen.blit(title, ((w - title.get_width())//2, int(h*0.32)))
+            screen.blit(score_line, ((w - score_line.get_width())//2, int(h*0.42)))
+            screen.blit(attempts_line, ((w - attempts_line.get_width())//2, int(h*0.48)))
+            screen.blit(info1, ((w - info1.get_width())//2, int(h*0.56)))
+            screen.blit(info2, ((w - info2.get_width())//2, int(h*0.62)))
