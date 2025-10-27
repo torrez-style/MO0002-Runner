@@ -25,7 +25,7 @@ class Juego:
             self.sin_niveles_cargados = False
         self.LABERINTO = self.niveles[0]["laberinto"]
         self.LABERINTO = [[0 if c in (2,3) else c for c in fila] for fila in self.LABERINTO]
-        self.FRAME_ENE = max(12, self.niveles[0].get("vel_enemigos", 18))
+        self.FRAME_ENE = max(10, self.niveles[0].get("vel_enemigos", 14))
         self.tam_celda = 32
         self.pos_x = 1; self.pos_y = 1
         self.estrellas = []
@@ -53,7 +53,7 @@ class Juego:
         self._reiniciar_juego()
 
     def _crear_nivel_emergencia(self):
-        return {"nombre":"Emergencia","laberinto":[[1,1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,0,1],[1,0,1,1,1,1,1,0,0,1],[1,0,0,0,0,0,0,0,1,1],[1,1,1,1,1,1,1,1,1,1]],"vel_enemigos":20,"estrellas":1,"enemigos":0,"powerups":0,"entrada":[1,1],"salida":[1,1],"colores":{"pared":[100,100,100],"suelo":[200,200,200],"enemigo":[220,50,50]}}
+        return {"nombre":"Emergencia","laberinto":[[1,1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,0,1],[1,0,1,1,1,1,1,0,0,1],[1,0,0,0,0,0,0,0,1,1],[1,1,1,1,1,1,1,1,1,1]],"vel_enemigos":14,"estrellas":3,"enemigos":1,"powerups":0,"entrada":[1,1],"salida":[1,1],"colores":{"pared":[100,100,100],"suelo":[200,200,200],"enemigo":[220,50,50]}}
 
     def _cargar_niveles(self):
         try:
@@ -82,10 +82,10 @@ class Juego:
 
     def _generar_posiciones_validas(self, lab, c, ex):
         pos=[]; filas, cols = len(lab), len(lab[0]); i=0
-        while len(pos)<c and i<c*50:
+        while len(pos)<c and i<c*80:
             x,y = random.randint(1, cols-2), random.randint(1, filas-2)
-            if lab[y][x]==0 and (x,y) not in ex+pos: pos.append((x,y)); i+=1
-            else: i+=1
+            if lab[y][x]==0 and (x,y) not in ex+pos: pos.append((x,y))
+            i+=1
         return pos
 
     def _jugador_celda_libre(self):
@@ -98,22 +98,24 @@ class Juego:
         self.LABERINTO=[[0 if c in (2,3) else c for c in fila] for fila in lvl["laberinto"]]
         self.pos_x,self.pos_y=self._jugador_celda_libre()
         exclus=[self.pos_x,self.pos_y]
-        self.estrellas=self._generar_posiciones_validas(self.LABERINTO,lvl.get("estrellas",3),exclus)
-        self.enemigos=self._generar_posiciones_validas(self.LABERINTO,lvl.get("enemigos",2),exclus+self.estrellas)
-        self.powerups=self._generar_posiciones_validas(self.LABERINTO,lvl.get("powerups",2),exclus+self.estrellas+self.enemigos)
+        # Forzar exactamente 3 estrellas por nivel
+        estrellas_objetivo = 3
+        self.estrellas=self._generar_posiciones_validas(self.LABERINTO,estrellas_objetivo,exclus)
+        self.enemigos=self._generar_posiciones_validas(self.LABERINTO,max(1,lvl.get("enemigos",2)),exclus+self.estrellas)
+        self.powerups=self._generar_posiciones_validas(self.LABERINTO,lvl.get("powerups",1),exclus+self.estrellas+self.enemigos)
         self.vidas=3; self.contador_frames=0; self.powerup_activo=None; self.powerup_timer=0; self.texto_mensaje=""; self.mensaje_frames=0
-        # NUEVO: Exigir recoger TODAS las estrellas en cada nivel
-        self.estrellas_total = len(self.estrellas)
 
     def _avanzar_nivel(self):
-        # Solo avanzar si NO hay estrellas pendientes
+        # Regla estricta: solo avanzar si NO quedan estrellas
         if len(self.estrellas)>0:
+            # Feedback opcional en HUD
+            self.texto_mensaje=f"Faltan {len(self.estrellas)} estrella(s)"; self.mensaje_frames=60
             return
         if self.nivel_actual < len(self.niveles)-1:
             self.nivel_actual+=1
             lvl=self.niveles[self.nivel_actual]
             self.LABERINTO=[[0 if c in (2,3) else c for c in fila] for fila in lvl["laberinto"]]
-            self.FRAME_ENE=max(10,lvl.get("vel_enemigos",12))
+            self.FRAME_ENE=max(8,lvl.get("vel_enemigos",12))
             self._configurar_tablero(); self._reiniciar_juego(); self.vista.titulo=f"Maze-Run - Nivel {self.nivel_actual+1}"
         else:
             self._estado_cambiar_a_game_over()
@@ -143,21 +145,26 @@ class Juego:
             def actualizar(self):
                 j=self.j
                 if j.vidas<=0: return
-                j.contador_frames+=1; delay=max(14,j.FRAME_ENE)
+                j.contador_frames+=1
+                delay=max(10,j.FRAME_ENE)
                 if j.contador_frames<delay: return
-                j.contador_frames=0; nuevos,ocup=[],set()
+                j.contador_frames=0
+                nuevos,ocup=[],set()
                 for ex,ey in j.enemigos:
-                    paso=None
-                    if j.powerup_activo!='invisible':
-                        p=bfs_siguiente_paso(j.LABERINTO,(ex,ey),(j.pos_x,j.pos_y))
-                        if p and p not in ocup: paso=p
+                    # Persecución BFS con fallback a movimiento hacia jugador si no hay camino directo
+                    paso=bfs_siguiente_paso(j.LABERINTO,(ex,ey),(j.pos_x,j.pos_y)) if j.powerup_activo!='invisible' else None
                     if not paso:
-                        for dx,dy in [(0,1),(0,-1),(1,0),(-1,0)]:
-                            nx,ny=ex+dx,ey+dy
+                        # Heurística Manhattan: mover hacia el jugador priorizando eje dominante
+                        dx = 1 if j.pos_x>ex else -1 if j.pos_x<ex else 0
+                        dy = 1 if j.pos_y>ey else -1 if j.pos_y<ey else 0
+                        candidatos=[(ex+dx,ey),(ex,ey+dy),(ex+dx,ey+dy),(ex-dx,ey),(ex,ey-dy)]
+                        paso=None
+                        for nx,ny in candidatos:
                             if 0<=ny<len(j.LABERINTO) and 0<=nx<len(j.LABERINTO[0]) and j.LABERINTO[ny][nx]!=1 and (nx,ny) not in ocup:
                                 paso=(nx,ny); break
                     ex,ey=paso or (ex,ey)
-                    if (ex,ey)==(j.pos_x,j.pos_y) and j.powerup_activo!='invulnerable': j.evento_mgr.publicar(EventoColisionEnemigo((j.pos_x,j.pos_y),(ex,ey)))
+                    if (ex,ey)==(j.pos_x,j.pos_y) and j.powerup_activo!='invulnerable':
+                        j.evento_mgr.publicar(EventoColisionEnemigo((j.pos_x,j.pos_y),(ex,ey)))
                     ocup.add((ex,ey)); nuevos.append((ex,ey))
                 j.enemigos=nuevos
         class ManejadorColisiones:
@@ -172,7 +179,6 @@ class Juego:
                 j=self.j
                 if e.posicion in j.estrellas:
                     j.estrellas.remove(e.posicion); j.puntuacion+=10
-                    # Avanzar de nivel SOLO cuando no queden estrellas
                     if not j.estrellas:
                         j._avanzar_nivel()
         class ManejadorMenu:
@@ -233,15 +239,16 @@ class Juego:
                 self.vista.limpiar_pantalla((0,0,0))
                 lvl=self.niveles[self.nivel_actual]
                 col_pared=tuple(lvl.get("colores",{}).get("pared",(80,80,80)))
-                col_suelo=tuple(lvl.get("colores",{}).get("suelo",(220,220,220)))
+                col_suelo=tuple(lvl.get("colores",{}).get("suelo",(220,230,245)))
                 col_enem=tuple(lvl.get("colores",{}).get("enemigo",(220,50,50)))
                 self.vista.dibujar_laberinto(self.LABERINTO,self.tam_celda,col_pared,col_suelo)
                 for ex,ey in self.enemigos: self.vista.dibujar_enemigo(ex*self.tam_celda,ey*self.tam_celda,self.tam_celda,color=col_enem)
                 for sx,sy in self.estrellas: self.vista.dibujar_estrella(sx*self.tam_celda,sy*self.tam_celda,self.tam_celda)
                 for px,py in self.powerups: self.vista.dibujar_powerup(px*self.tam_celda,py*self.tam_celda,self.tam_celda)
                 self.vista.dibujar_jugador(self.pos_x*self.tam_celda,self.pos_y*self.tam_celda,self.tam_celda)
+                # Mostrar HUD con estrellas restantes
                 self.vista.dibujar_hud(self.vidas,self.puntuacion)
-                if self.sin_niveles_cargados: self.vista.dibujar_texto("MODO DEMO - Cargar laberintos desde Administración", 50, 30, 24, (255,200,100))
+                self.vista.dibujar_texto(f"Estrellas restantes: {len(self.estrellas)}", 20, 20, 24, (255,255,0))
                 if self.texto_mensaje and self.mensaje_frames>0: self.vista.dibujar_texto(self.texto_mensaje, 120, 60, 32, (255,64,64))
                 self.vista.actualizar()
             elif self.estado=="MENU":
