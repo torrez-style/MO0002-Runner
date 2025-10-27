@@ -1,5 +1,5 @@
 """
-Bootstrap: pérdida de vida al tocar enemigo y pantalla de Game Over con reinicio o menú
+Bootstrap: pantalla de Game Over muestra puntaje final y contador de intentos
 """
 import random
 import pygame
@@ -28,6 +28,8 @@ class GameBootstrap:
         # HUD y lógica
         self.lives = 3
         self.score = 0
+        # Intentos
+        self.attempts = 1
         # Enemigos
         self.enemy_tick = 0
         self.enemy_delay = 10
@@ -125,10 +127,10 @@ class GameBootstrap:
         if self.game_over:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    # Reiniciar nivel
+                    # Reiniciar nivel y aumentar intento
+                    self.attempts += 1
                     self.load_levels()
                 elif event.key == pygame.K_ESCAPE:
-                    # Indicar al motor que vuelva a menú usando una bandera
                     return "BACK_TO_MENU"
             return None
         if event.type == pygame.KEYDOWN:
@@ -200,9 +202,7 @@ class GameBootstrap:
         board_h = rows * cell
         offset = ((w - board_w)//2, (h - board_h)//2)
 
-        # Si hay game over, mostrar overlay y opciones
         if self.game_over:
-            # Dibujo congelado del último frame del tablero
             self.renderer.draw_maze(screen, self.grid, self.colors, offset=offset)
             for sx, sy in self.stars:
                 rect = pygame.Rect(offset[0] + sx*cell + 10, offset[1] + sy*cell + 10, cell-20, cell-20)
@@ -210,21 +210,23 @@ class GameBootstrap:
             for e in self.enemies:
                 self.renderer.draw_enemy(screen, e, color=tuple(self.colors.get("enemigo", (220,50,50))), offset=offset)
             self.renderer.draw_player(screen, tuple(self.player), offset=offset)
-            
             overlay = pygame.Surface((w, h), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 160))
             screen.blit(overlay, (0, 0))
             title_font = pygame.font.SysFont(None, 72)
             info_font = pygame.font.SysFont(None, 36)
             title = title_font.render("PERDISTE", True, (255, 100, 100))
+            score_line = info_font.render(f"Puntaje final: {self.score}", True, (230, 230, 230))
+            attempts_line = info_font.render(f"Intentos: {self.attempts}", True, (230, 230, 230))
             info1 = info_font.render("ENTER: Reiniciar nivel", True, (230, 230, 230))
             info2 = info_font.render("ESC: Volver al menú", True, (230, 230, 230))
-            screen.blit(title, ((w - title.get_width())//2, int(h*0.35)))
-            screen.blit(info1, ((w - info1.get_width())//2, int(h*0.50)))
-            screen.blit(info2, ((w - info2.get_width())//2, int(h*0.58)))
+            screen.blit(title, ((w - title.get_width())//2, int(h*0.32)))
+            screen.blit(score_line, ((w - score_line.get_width())//2, int(h*0.42)))
+            screen.blit(attempts_line, ((w - attempts_line.get_width())//2, int(h*0.48)))
+            screen.blit(info1, ((w - info1.get_width())//2, int(h*0.56)))
+            screen.blit(info2, ((w - info2.get_width())//2, int(h*0.62)))
             return
 
-        # Juego normal
         self.renderer.draw_maze(screen, self.grid, self.colors, offset=offset)
         for sx, sy in self.stars:
             rect = pygame.Rect(offset[0] + sx*cell + 10, offset[1] + sy*cell + 10, cell-20, cell-20)
@@ -235,9 +237,8 @@ class GameBootstrap:
         for e in self.enemies:
             self.renderer.draw_enemy(screen, e, color=tuple(self.colors.get("enemigo", (220,50,50))), offset=offset)
         self.renderer.draw_player(screen, tuple(self.player), offset=offset)
-
         if self.font_hud is None:
             self.font_hud = pygame.font.SysFont(None, 28)
-        hud_text = f"Vidas: {self.lives}   Puntaje: {self.score}   Estrellas: {len(self.stars)}"
+        hud_text = f"Vidas: {self.lives}   Puntaje: {self.score}   Estrellas: {len(self.stars)}   Intentos: {self.attempts}"
         hud_surf = self.font_hud.render(hud_text, True, (255,255,255))
         screen.blit(hud_surf, (20, 20))
