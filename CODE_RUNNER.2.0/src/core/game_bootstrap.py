@@ -2,11 +2,13 @@
 Bootstrap: integra efectos de sonido y nombre dinámico del jugador
 """
 import random
+import os
 import pygame
 from typing import List, Tuple
 from datetime import datetime
 from src.ui.maze_renderer import MazeRenderer
 from src.data.file_manager import load_json, save_json, SCORES_FILE
+from config.settings import settings
 from src.audio.sound_manager import sound_manager
 
 class GameBootstrap:
@@ -40,8 +42,39 @@ class GameBootstrap:
         """Establece el nombre del jugador"""
         self.player_name = name.strip() if name.strip() else "SULA"
 
-    def load_levels(self, path="assets/config/levels.json"):
-        data = load_json(path, {"niveles": []})
+    def load_levels(self, path: str = None):
+        """
+        Carga los niveles desde JSON. Busca en varias rutas si no se provee una.
+
+        Prioridad de rutas:
+        1. path (si se pasa)
+        2. settings.LEVELS_FILE
+        3. assets/config/levels.json
+        4. niveles.json (archivo en la raíz del proyecto)
+        5. CODE_RUNNER/niveles.json (compatibilidad retro)
+        """
+        candidates = []
+        if path:
+            candidates.append(path)
+        # preferir la ruta configurada
+        try:
+            cfg_path = settings.LEVELS_FILE
+        except Exception:
+            cfg_path = "assets/config/levels.json"
+        candidates.append(cfg_path)
+        candidates.extend([
+            "assets/config/levels.json",
+            "niveles.json",
+            os.path.join("CODE_RUNNER", "niveles.json")
+        ])
+
+        data = {"niveles": []}
+        for p in candidates:
+            data = load_json(p, {"niveles": []})
+            if data and isinstance(data, dict) and data.get("niveles"):
+                # mantener la ruta usada (útil para debug)
+                # no es estrictamente necesario guardar, sólo devolvemos True/False
+                break
         self.levels = data.get("niveles", [])
         if not self.levels:
             return False
@@ -57,13 +90,8 @@ class GameBootstrap:
         self.enemies = libres[:count]
         est_count = max(1, int(self.level.get("estrellas", 3)))
         libres2 = [p for p in libres if p not in self.enemies]
-        random.shuffle(libres2)
+
         self.stars = libres2[:est_count]
-        self.lives = 3
-        self.score = 0
-        self.win = False
-        self.game_over = False
-        self.hit_flash_timer = 0
         return True
 
     def _can_move(self, x, y):
@@ -76,15 +104,23 @@ class GameBootstrap:
         px, py = self.player
         dirs = []
         if abs(px-ex) >= abs(py-ey):
-            if px > ex: dirs.append((1,0))
-            if px < ex: dirs.append((-1,0))
-            if py > ey: dirs.append((0,1))
-            if py < ey: dirs.append((0,-1))
+            if px > ex:
+                dirs.append((1,0))
+            if px < ex:
+                dirs.append((-1,0))
+            if py > ey:
+                dirs.append((0,1))
+            if py < ey:
+                dirs.append((0,-1))
         else:
-            if py > ey: dirs.append((0,1))
-            if py < ey: dirs.append((0,-1))
-            if px > ex: dirs.append((1,0))
-            if px < ex: dirs.append((-1,0))
+            if py > ey:
+                dirs.append((0,1))
+            if py < ey:
+                dirs.append((0,-1))
+            if px > ex:
+                dirs.append((1,0))
+            if px < ex:
+                dirs.append((-1,0))
         for d in [(1,0),(-1,0),(0,1),(0,-1)]:
             if d not in dirs:
                 dirs.append(d)
@@ -120,10 +156,14 @@ class GameBootstrap:
             return None
         if event.type == pygame.KEYDOWN:
             dx = dy = 0
-            if event.key == pygame.K_UP: dy = -1
-            elif event.key == pygame.K_DOWN: dy = 1
-            elif event.key == pygame.K_LEFT: dx = -1
-            elif event.key == pygame.K_RIGHT: dx = 1
+            if event.key == pygame.K_UP:
+                dy = -1
+            elif event.key == pygame.K_DOWN:
+                dy = 1
+            elif event.key == pygame.K_LEFT:
+                dx = -1
+            elif event.key == pygame.K_RIGHT:
+                dx = 1
             if dx or dy:
                 nx, ny = self.player[0] + dx, self.player[1] + dy
                 if self._can_move(nx, ny):

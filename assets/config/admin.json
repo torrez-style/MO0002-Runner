@@ -1,9 +1,0 @@
-{
-  "password": "admin",
-  "sounds_enabled": true,
-  "admin_features": {
-    "reset_hall_of_fame": true,
-    "toggle_sounds": true,
-    "list_levels": true
-  }
-}

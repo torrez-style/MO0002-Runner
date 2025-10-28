@@ -27,7 +27,8 @@ class Juego:
         self.LABERINTO = [[0 if c in (2,3) else c for c in fila] for fila in self.LABERINTO]
         self.VELOCIDAD_ENEMIGOS = max(10, self.niveles[0].get("vel_enemigos", 14))
         self.tamaño_celda = 32
-        self.posicion_x = 1; self.posicion_y = 1
+        self.posicion_x = 1
+        self.posicion_y = 1
         self.estrellas = []
         self.enemigos = []
         self.potenciadores = []

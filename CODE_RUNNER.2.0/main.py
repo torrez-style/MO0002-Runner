@@ -221,13 +221,6 @@ def main() -> int:
         print("Inicializando motor del juego...")
         game_engine = GameEngine()
         
-        print("Iniciando Maze Runner...")
-        print("\n" + "="*50)
-        print("Controles:")
-        print("   Flechas: Mover jugador")
-        print("   ESC    : Menú principal")
-        print("   ENTER  : Seleccionar/Reiniciar")
-        print("="*50 + "\n")
         
         # Ejecutar juego
         game_engine.run()

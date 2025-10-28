@@ -1,5 +1,5 @@
 import pygame
-
+from constantes import color_jugador, color_computadora
 class Vista:
     def __init__(self, ancho, alto, titulo=""):
         pygame.display.set_caption(titulo)
@@ -35,9 +35,9 @@ class Vista:
                     pygame.draw.rect(self.pantalla, (40,40,40), rectangulo, 1)
 
     def dibujar_jugador(self, x, y, tamaño):
-        pygame.draw.circle(self.pantalla, (100, 0, 255), (self.desplazamiento_x + x + tamaño//2, self.desplazamiento_y + y + tamaño//2), tamaño//2)
+        pygame.draw.circle(self.pantalla, color_jugador, (self.desplazamiento_x + x + tamaño//2, self.desplazamiento_y + y + tamaño//2), tamaño//2)
 
-    def dibujar_enemigo(self, x, y, tamaño, color=(220, 50, 50)):
+    def dibujar_enemigo(self, x, y, tamaño, color=color_computadora):
         pygame.draw.circle(self.pantalla, color, (self.desplazamiento_x + x + tamaño//2, self.desplazamiento_y + y + tamaño//2), tamaño//2)
 
     def dibujar_estrella(self, x, y, tamaño):
