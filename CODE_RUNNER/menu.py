@@ -4,18 +4,18 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import pygame
 from evento import EventoSeleccionMenu
+from constantes import ESTADO_MENU, ESTADO_JUEGO, ESTADO_SALON, ESTADO_ADMIN, ESTADO_GAME_OVER
 
-# Claves internas del estado/menú (sin tildes)
-OPCION_JUEGO = "JUEGO"
-OPCION_SALON = "SALON_DE_LA_FAMA"
-OPCION_ADMIN = "ADMINISTRACION"
+# Claves internas del estado/menú (usar constantes compartidas)
+OPCION_JUEGO = ESTADO_JUEGO
+OPCION_SALON = ESTADO_SALON
+OPCION_ADMIN = ESTADO_ADMIN
 OPCION_SALIR = "SALIR"
 
 class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
         self.vista = vista
         self.administrador_eventos = administrador_eventos
-        # Texto mostrado puede llevar tildes, claves internas no
         self.opciones = [OPCION_JUEGO, OPCION_SALON, OPCION_ADMIN, OPCION_SALIR]
         self.opciones_subadministracion = ["Cargar laberinto", "Reiniciar salon", "Volver"]
         self.en_subadministracion = False
@@ -23,7 +23,6 @@ class MenuPrincipal:
         self.indice_principal = 0
         self.fuente_titulo = pygame.font.SysFont(None, 48)
         self.fuente_opcion = pygame.font.SysFont(None, 36)
-        # Mover credencial a variable de entorno si se desea
         self.contrasena_administrador = os.getenv("GAME_ADMIN_PASS", "admin2025")
 
     def manejar_eventos(self, evento):
@@ -64,7 +63,6 @@ class MenuPrincipal:
                         self.administrador_eventos.publicar(EventoSeleccionMenu(OPCION_SALIR))
 
     def _autenticar_administrador(self):
-        # En entornos sin tkinter, capturar excepciones
         ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
         try:
             contrasena_ingresada = simpledialog.askstring("Acceso Administrativo", "Ingrese la contraseña de administrador:", show='*')
@@ -109,7 +107,6 @@ class MenuPrincipal:
                 self.vista.pantalla.blit(superficie, (x_opcion, y_opcion))
         else:
             for indice, opcion in enumerate(self.opciones):
-                # Mostrar con tildes donde aplica
                 etiqueta = {
                     OPCION_JUEGO: "JUEGO",
                     OPCION_SALON: "SALÓN DE LA FAMA",
