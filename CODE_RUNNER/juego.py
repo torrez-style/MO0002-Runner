@@ -16,7 +16,9 @@ from constantes import (
     PUNTOS_POR_ESTRELLA, VIDAS_INICIALES, TAMAÑO_CELDA,
     POTENCIADOR_INVULNERABLE, POTENCIADOR_CONGELAR, POTENCIADOR_INVISIBLE,
     ESTADO_MENU, ESTADO_JUEGO, ESTADO_GAME_OVER, ESTADO_SALON, ESTADO_ADMIN,
+    CELDA_PARED, CELDA_VACIA, CELDA_ENTRADA, CELDA_SALIDA,
 )
+from salon_de_la_fama import SalonDeLaFama
 
 
 class Juego:
@@ -34,11 +36,12 @@ class Juego:
         else:
             self.sin_niveles_cargados = False
 
+        # Mantener entrada/salida en matriz para render y lógica; usar helper para colisiones
         self.laberinto = self.niveles[0]["laberinto"]
-        self.laberinto = [[0 if c in (2, 3) else c for c in fila] for fila in self.laberinto]
         self.velocidad_enemigos = max(10, self.niveles[0].get("vel_enemigos", 14))
         self.tamano_celda = TAMAÑO_CELDA
 
+        # Estado del jugador y entidades
         self.posicion_x = 1
         self.posicion_y = 1
         self.estrellas = []
@@ -57,6 +60,9 @@ class Juego:
         self.temporizador_paso_jugador = 0
         self.direcciones_presionadas = set()
 
+        # Salón de la fama
+        self.salon = SalonDeLaFama()
+
         pygame.init()
         self.reloj = pygame.time.Clock()
         self.vista = Vista(self.ancho, self.alto, f"Maze-Run - Nivel {self.nivel_actual + 1}")
@@ -66,7 +72,290 @@ class Juego:
         self._configurar_tablero()
         self._reiniciar_juego()
 
-    # ... resto del archivo permanece igual, solo reemplazos de strings por constantes de estado ...
+    def _crear_nivel_emergencia(self):
+        return {
+            "nombre": "Emergencia",
+            "laberinto": [
+                [1,1,1,1,1,1,1,1,1,1],
+                [1,2,0,0,0,0,0,0,3,1],
+                [1,0,1,1,1,1,1,0,0,1],
+                [1,0,0,0,0,0,0,0,1,1],
+                [1,1,1,1,1,1,1,1,1,1]
+            ],
+            "vel_enemigos": 14,
+            "estrellas": 3,
+            "enemigos": 1,
+            "powerups": 0,
+            "entrada": [1, 1],
+            "salida": [8, 1],
+            "colores": {"pared": [100, 100, 100], "suelo": [200, 200, 200], "enemigo": [220, 50, 50]},
+        }
+
+    def _cargar_niveles(self):
+        try:
+            ruta_completa = os.path.join("CODE_RUNNER", self.ruta_niveles)
+            if not os.path.exists(ruta_completa):
+                ruta_completa = self.ruta_niveles
+            with open(ruta_completa, "r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+            if "niveles" in datos and isinstance(datos["niveles"], list):
+                return datos["niveles"]
+            return []
+        except Exception as excepcion:
+            print(f"Error cargando niveles: {excepcion}")
+            return []
+
+    def _configurar_tablero(self):
+        filas, columnas = len(self.laberinto), len(self.laberinto[0])
+        ancho_tablero = self.tamano_celda * columnas
+        alto_tablero = self.tamano_celda * filas
+        self.vista.desplazamiento_x = (self.vista.ancho - ancho_tablero) // 2
+        self.vista.desplazamiento_y = (self.vista.alto - alto_tablero) // 2 + 20
+
+    def _es_celda_transitable(self, x, y):
+        if not (0 <= y < len(self.laberinto) and 0 <= x < len(self.laberinto[0])):
+            return False
+        celda = self.laberinto[y][x]
+        return celda in (CELDA_VACIA, CELDA_ENTRADA, CELDA_SALIDA)
+
+    def _generar_posiciones_validas(self, laberinto, cantidad, exclusiones):
+        posiciones = []
+        filas, columnas = len(laberinto), len(laberinto[0])
+        intentos = 0
+        exclusiones_set = set(exclusiones)
+        while len(posiciones) < cantidad and intentos < cantidad * 80:
+            x, y = random.randint(1, columnas - 2), random.randint(1, filas - 2)
+            if self._es_celda_transitable(x, y) and (x, y) not in exclusiones_set and (x, y) not in posiciones:
+                posiciones.append((x, y))
+            intentos += 1
+        return posiciones
+
+    def _obtener_celda_libre_jugador(self):
+        libres = [
+            (x, y)
+            for y in range(1, len(self.laberinto) - 1)
+            for x in range(1, len(self.laberinto[0]) - 1)
+            if self._es_celda_transitable(x, y) and (x, y) not in self.enemigos
+        ]
+        return random.choice(libres) if libres else (1, 1)
+
+    def _recolocar_enemigos_si_vacio(self, nivel):
+        if not self.enemigos:
+            exclusiones = [(self.posicion_x, self.posicion_y)] + self.estrellas
+            self.enemigos = self._generar_posiciones_validas(
+                self.laberinto, max(1, nivel.get("enemigos", 1)), exclusiones
+            )
+
+    def _reiniciar_juego(self):
+        if self.nivel_actual >= len(self.niveles):
+            self.nivel_actual = 0
+        nivel_actual = self.niveles[self.nivel_actual]
+        self.laberinto = nivel_actual["laberinto"]
+        self.posicion_x, self.posicion_y = self._obtener_celda_libre_jugador()
+        exclusiones = [(self.posicion_x, self.posicion_y)]
+        objetivo_estrellas = nivel_actual.get("estrellas", 3)
+        self.estrellas = self._generar_posiciones_validas(self.laberinto, objetivo_estrellas, exclusiones)
+        self.enemigos = self._generar_posiciones_validas(
+            self.laberinto, max(1, nivel_actual.get("enemigos", 1)), exclusiones + self.estrellas
+        )
+        self.potenciadores = self._generar_posiciones_validas(
+            self.laberinto, nivel_actual.get("powerups", 1), exclusiones + self.estrellas + self.enemigos
+        )
+        self._recolocar_enemigos_si_vacio(nivel_actual)
+        self.desplazamiento_interfaz_x = 20
+        self.desplazamiento_interfaz_y = 48
+        self.vidas = VIDAS_INICIALES
+        self.contador_cuadros = 0
+        self.potenciador_activo = None
+        self.temporizador_potenciador = 0
+        self.mensaje_texto = ""
+        self.cuadros_mensaje = 0
+
+    def _ha_llegado_a_salida(self):
+        return self.laberinto[self.posicion_y][self.posicion_x] == CELDA_SALIDA
+
+    def _avanzar_nivel(self):
+        if len(self.estrellas) > 0:
+            self.mensaje_texto = f"Faltan {len(self.estrellas)} estrella(s)"
+            self.cuadros_mensaje = 60
+            return
+        # Si no quedan estrellas y el jugador está en la salida, avanza
+        if not self._ha_llegado_a_salida():
+            self.mensaje_texto = "Ve a la salida para continuar"
+            self.cuadros_mensaje = 60
+            return
+        if self.nivel_actual < len(self.niveles) - 1:
+            self.nivel_actual += 1
+            nivel_actual = self.niveles[self.nivel_actual]
+            self.laberinto = nivel_actual["laberinto"]
+            self.velocidad_enemigos = max(8, nivel_actual.get("vel_enemigos", 12))
+            self._configurar_tablero()
+            self._reiniciar_juego()
+            self.vista.titulo = f"Maze-Run - Nivel {self.nivel_actual + 1}"
+        else:
+            self._cambiar_a_fin_de_juego()
+
+    def _cambiar_a_fin_de_juego(self):
+        self.puntuacion_final = self.puntuacion
+        self._registrar_puntuacion_en_salon()
+        self.estado = ESTADO_GAME_OVER
+
+    def _registrar_puntuacion_en_salon(self):
+        # Carga y escribe puntuaciones.json con el nuevo puntaje
+        ruta = "puntuaciones.json" if os.path.exists("puntuaciones.json") else os.path.join("CODE_RUNNER", "puntuaciones.json")
+        try:
+            if os.path.exists(ruta):
+                with open(ruta, "r", encoding="utf-8") as f:
+                    texto = f.read().strip()
+                    datos = json.loads(texto) if texto else []
+            else:
+                datos = []
+        except Exception:
+            datos = []
+        # Pedir nombre simple por consola si no hay UI; por ahora usar un nombre por defecto
+        nombre = os.getenv("PLAYER_NAME", "Jugador")
+        datos.append({"nombre": nombre, "puntuacion": self.puntuacion_final})
+        try:
+            with open(ruta, "w", encoding="utf-8") as f:
+                json.dump(datos, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"No se pudo guardar puntuación: {e}")
+
+    def _registrar_manejadores(self):
+        class ControladorJugador:
+            def __init__(self, juego, administrador):
+                self.juego = juego
+                administrador.registrar(EventoMoverJugador, self)
+
+            def notificar(self, evento):
+                j = self.juego
+                if j.vidas <= 0:
+                    return
+                delta_x = delta_y = 0
+                if evento.direccion == 'arriba':
+                    delta_y = -1
+                elif evento.direccion == 'abajo':
+                    delta_y = 1
+                elif evento.direccion == 'izquierda':
+                    delta_x = -1
+                elif evento.direccion == 'derecha':
+                    delta_x = 1
+                nueva_x, nueva_y = j.posicion_x + delta_x, j.posicion_y + delta_y
+                if j._es_celda_transitable(nueva_x, nueva_y):
+                    j.posicion_x, j.posicion_y = nueva_x, nueva_y
+
+        class ManejadorPotenciadores:
+            def __init__(self, juego, administrador):
+                self.juego = juego
+                administrador.registrar(EventoPotenciadorRecogido, self)
+
+            def notificar(self, evento):
+                self.juego.potenciador_activo = evento.tipo
+                self.juego.temporizador_potenciador = self.juego.duracion_potenciador
+
+        class ControladorEnemigos:
+            def __init__(self, juego, administrador):
+                self.juego = juego
+
+            def actualizar(self):
+                j = self.juego
+                if j.vidas <= 0:
+                    return
+                j.contador_cuadros += 1
+                retraso = max(10, j.velocidad_enemigos)
+                if j.contador_cuadros < retraso:
+                    return
+                j.contador_cuadros = 0
+                nuevos_enemigos, ocupadas = [], set()
+                for enemigo_x, enemigo_y in j.enemigos:
+                    objetivo = (j.posicion_x, j.posicion_y)
+                    siguiente_paso = bfs_siguiente_paso(
+                        [[0 if c != CELDA_PARED else 1 for c in fila] for fila in j.laberinto],
+                        (enemigo_x, enemigo_y),
+                        objetivo,
+                    ) if j.potenciador_activo != POTENCIADOR_INVISIBLE else None
+                    if not siguiente_paso:
+                        delta_x = 1 if j.posicion_x > enemigo_x else -1 if j.posicion_x < enemigo_x else 0
+                        delta_y = 1 if j.posicion_y > enemigo_y else -1 if j.posicion_y < enemigo_y else 0
+                        candidatos = [
+                            (enemigo_x + delta_x, enemigo_y),
+                            (enemigo_x, enemigo_y + delta_y),
+                            (enemigo_x + delta_x, enemigo_y + delta_y),
+                            (enemigo_x - delta_x, enemigo_y),
+                            (enemigo_x, enemigo_y - delta_y),
+                        ]
+                        siguiente_paso = None
+                        for nueva_x, nueva_y in candidatos:
+                            if j._es_celda_transitable(nueva_x, nueva_y) and (nueva_x, nueva_y) not in ocupadas:
+                                siguiente_paso = (nueva_x, nueva_y)
+                                break
+                    enemigo_x, enemigo_y = siguiente_paso or (enemigo_x, enemigo_y)
+                    if (enemigo_x, enemigo_y) == (j.posicion_x, j.posicion_y) and j.potenciador_activo != POTENCIADOR_INVULNERABLE:
+                        j.administrador_eventos.publicar(
+                            EventoColisionEnemigo((j.posicion_x, j.posicion_y), (enemigo_x, enemigo_y))
+                        )
+                    ocupadas.add((enemigo_x, enemigo_y))
+                    nuevos_enemigos.append((enemigo_x, enemigo_y))
+                j.enemigos = nuevos_enemigos
+
+        class ManejadorColisiones:
+            def __init__(self, juego, administrador):
+                self.juego = juego
+                administrador.registrar(EventoColisionEnemigo, self)
+
+            def notificar(self, evento):
+                j = self.juego
+                j.vidas -= 1
+                if j.vidas > 0:
+                    j.posicion_x, j.posicion_y = j._obtener_celda_libre_jugador()
+                    j._recolocar_enemigos_si_vacio(j.niveles[j.nivel_actual])
+                else:
+                    j._cambiar_a_fin_de_juego()
+
+        class ManejadorEstrellas:
+            def __init__(self, juego, administrador):
+                self.juego = juego
+                administrador.registrar(EventoRecogerEstrella, self)
+
+            def notificar(self, evento):
+                j = self.juego
+                if evento.posicion in j.estrellas:
+                    j.estrellas.remove(evento.posicion)
+                    j.puntuacion += PUNTOS_POR_ESTRELLA
+                    if not j.estrellas:
+                        j._avanzar_nivel()
+
+        class ManejadorMenu:
+            def __init__(self, juego, administrador):
+                self.juego = juego
+                administrador.registrar(EventoSeleccionMenu, self)
+
+            def notificar(self, evento):
+                j = self.juego
+                if evento.opcion == ESTADO_JUEGO:
+                    if not j.sin_niveles_cargados:
+                        j.nivel_actual = 0
+                        j._reiniciar_juego()
+                        j.estado = ESTADO_JUEGO
+                    else:
+                        j.mensaje_texto = "Debe cargar laberintos desde Administración primero"
+                        j.cuadros_mensaje = 120
+                elif evento.opcion == "SALIR":
+                    pygame.quit()
+                    sys.exit(0)
+                elif evento.opcion == ESTADO_ADMIN:
+                    j._recargar_niveles()
+                    j.estado = ESTADO_MENU
+                else:
+                    j.estado = evento.opcion
+
+        self.controlador_enemigos = ControladorEnemigos(self, self.administrador_eventos)
+        ControladorJugador(self, self.administrador_eventos)
+        ManejadorPotenciadores(self, self.administrador_eventos)
+        ManejadorColisiones(self, self.administrador_eventos)
+        ManejadorEstrellas(self, self.administrador_eventos)
+        ManejadorMenu(self, self.administrador_eventos)
+
     def ejecutar(self):
         while True:
             for evento in pygame.event.get():
@@ -113,8 +402,63 @@ class Juego:
                         self.estado = ESTADO_MENU
 
             if self.estado == ESTADO_JUEGO:
-                # ... sin cambios de lógica, omito por brevedad ...
-                pass
+                # Movimiento del jugador con repetición
+                if self.direcciones_presionadas:
+                    self.temporizador_paso_jugador -= 1
+                    if self.temporizador_paso_jugador <= 0:
+                        if 'arriba' in self.direcciones_presionadas:
+                            self.administrador_eventos.publicar(EventoMoverJugador('arriba'))
+                        elif 'abajo' in self.direcciones_presionadas:
+                            self.administrador_eventos.publicar(EventoMoverJugador('abajo'))
+                        elif 'izquierda' in self.direcciones_presionadas:
+                            self.administrador_eventos.publicar(EventoMoverJugador('izquierda'))
+                        elif 'derecha' in self.direcciones_presionadas:
+                            self.administrador_eventos.publicar(EventoMoverJugador('derecha'))
+                        self.temporizador_paso_jugador = self.retraso_paso_jugador
+
+                # Recolección de estrellas y potenciadores
+                if self.vidas > 0 and (self.posicion_x, self.posicion_y) in self.estrellas:
+                    self.administrador_eventos.publicar(EventoRecogerEstrella((self.posicion_x, self.posicion_y)))
+                if self.vidas > 0 and (self.posicion_x, self.posicion_y) in self.potenciadores:
+                    self.potenciadores.remove((self.posicion_x, self.posicion_y))
+                    self.administrador_eventos.publicar(
+                        EventoPotenciadorRecogido(random.choice([
+                            POTENCIADOR_INVULNERABLE,
+                            POTENCIADOR_CONGELAR,
+                            POTENCIADOR_INVISIBLE,
+                        ]))
+                    )
+
+                # Temporizador de potenciador
+                if self.temporizador_potenciador > 0:
+                    self.temporizador_potenciador -= 1
+                    if self.temporizador_potenciador == 0:
+                        self.potenciador_activo = None
+
+                if self.cuadros_mensaje > 0:
+                    self.cuadros_mensaje -= 1
+
+                # Actualizar enemigos
+                self.controlador_enemigos.actualizar()
+
+                # Renderizado
+                self.vista.limpiar_pantalla(COLOR_FONDO)
+                nivel_actual = self.niveles[self.nivel_actual]
+                color_pared = tuple(nivel_actual.get("colores", {}).get("pared", COLOR_PARED_DEFAULT))
+                color_suelo = tuple(nivel_actual.get("colores", {}).get("suelo", COLOR_SUELO_DEFAULT))
+                self.vista.dibujar_laberinto(self.laberinto, self.tamano_celda, color_pared, color_suelo)
+                for enemigo_x, enemigo_y in self.enemigos:
+                    self.vista.dibujar_enemigo(enemigo_x * self.tamano_celda, enemigo_y * self.tamano_celda, self.tamano_celda)
+                for estrella_x, estrella_y in self.estrellas:
+                    self.vista.dibujar_estrella(estrella_x * self.tamano_celda, estrella_y * self.tamano_celda, self.tamano_celda)
+                for potenciador_x, potenciador_y in self.potenciadores:
+                    self.vista.dibujar_potenciador(potenciador_x * self.tamano_celda, potenciador_y * self.tamano_celda, self.tamano_celda)
+                self.vista.dibujar_jugador(self.posicion_x * self.tamano_celda, self.posicion_y * self.tamano_celda, self.tamano_celda)
+                self.vista.dibujar_texto(f"Estrellas restantes: {len(self.estrellas)}", 20, 20, 24, COLOR_TEXTO_DESTACADO)
+                self.vista.dibujar_interfaz(self.vidas, self.puntuacion, x=20, y=self.desplazamiento_interfaz_y)
+                if self.mensaje_texto and self.cuadros_mensaje > 0:
+                    self.vista.dibujar_texto(self.mensaje_texto, 120, 60, 32, COLOR_TEXTO)
+                self.vista.actualizar()
             elif self.estado == ESTADO_MENU:
                 self.menu.dibujar()
                 self.vista.actualizar()
@@ -127,9 +471,19 @@ class Juego:
             elif self.estado == ESTADO_SALON:
                 self.vista.limpiar_pantalla((0, 0, 50))
                 self.vista.dibujar_texto("Salón de la Fama", 150, 200, 48, (255, 255, 0))
-                puntuaciones = self._cargar_json("puntuaciones.json", [])
+                # Mostrar top 10 desde puntuaciones.json
+                ruta = "puntuaciones.json" if os.path.exists("puntuaciones.json") else os.path.join("CODE_RUNNER", "puntuaciones.json")
+                try:
+                    if os.path.exists(ruta):
+                        with open(ruta, "r", encoding="utf-8") as f:
+                            texto = f.read().strip()
+                            datos = json.loads(texto) if texto else []
+                    else:
+                        datos = []
+                except Exception:
+                    datos = []
                 y_posicion = 270
-                for indice, entrada in enumerate(puntuaciones[:10]):
+                for indice, entrada in enumerate(datos[:10]):
                     if isinstance(entrada, dict) and 'nombre' in entrada and 'puntuacion' in entrada:
                         self.vista.dibujar_texto(f"{indice + 1}. {entrada['nombre']}: {entrada['puntuacion']}", 120, y_posicion, 24, (255, 255, 255))
                         y_posicion += 30
