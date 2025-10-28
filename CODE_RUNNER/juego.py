@@ -164,6 +164,12 @@ class Juego:
             exclusiones = [(self.posicion_x, self.posicion_y)] + self.estrellas
             self.enemigos = self._generar_posiciones_validas(self.laberinto, max(1, nivel.get("enemigos", 1)), exclusiones)
 
+    def _bonificar_estrellas_restantes(self, nivel_actual):
+        # Bonifica estrellas recogidas en el nivel actual
+        objetivo_estrellas = nivel_actual.get("estrellas", 0)
+        recogidas = max(0, objetivo_estrellas - len(self.estrellas))
+        if recogidas > 0: self.puntuacion += PUNTOS_POR_ESTRELLA * recogidas
+
     def _reiniciar_juego(self):
         if self.nivel_actual >= len(self.niveles): self.nivel_actual = 0
         nivel_actual = self.niveles[self.nivel_actual]
@@ -185,9 +191,10 @@ class Juego:
         return self.laberinto[self.posicion_y][self.posicion_x] == CELDA_SALIDA
 
     def _avanzar_nivel(self):
-        # Regla ajustada: basta con llegar a la salida; si aún hay estrellas, bonifica menos al final
         if not self._ha_llegado_a_salida():
             self.mensaje_texto = "Ve a la salida para continuar"; self.cuadros_mensaje = 60; return
+        # Bonificar estrellas recogidas en este nivel antes de pasar
+        self._bonificar_estrellas_restantes(self.niveles[self.nivel_actual])
         if self.nivel_actual < len(self.niveles) - 1:
             self.nivel_actual += 1; nivel_actual = self.niveles[self.nivel_actual]
             self.laberinto = nivel_actual["laberinto"]; self.velocidad_enemigos = max(8, nivel_actual.get("vel_enemigos", 12))
@@ -196,27 +203,18 @@ class Juego:
             self._cambiar_a_victoria()
 
     def _cambiar_a_victoria(self):
-        # Mensaje y registro de victoria
-        # Bonificación por estrellas recogidas:  PUNTOS_POR_ESTRELLA * (recogidas)
-        recogidas = self.niveles[self.nivel_actual].get("estrellas", 0) - len(self.estrellas)
-        if recogidas > 0:
-            self.puntuacion += PUNTOS_POR_ESTRELLA * recogidas
+        # Ya se bonificó al pasar el último nivel, registrar y mostrar victoria
         self.puntuacion_final = self.puntuacion
         self._registrar_puntuacion_en_perfiles()
-        self.estado = ESTADO_GAME_OVER
-        self.mensaje_texto = "¡Has ganado!"; self.cuadros_mensaje = 180
-        self._mostrar_victoria = True
+        self.estado = ESTADO_GAME_OVER; self.mensaje_texto = "¡Has ganado!"; self.cuadros_mensaje = 180; self._mostrar_victoria = True
 
     def _cambiar_a_fin_de_juego(self):
         self.puntuacion_final = self.puntuacion
         self._registrar_puntuacion_en_perfiles()
-        self.estado = ESTADO_GAME_OVER
-        self.mensaje_texto = "GAME OVER"; self.cuadros_mensaje = 180
-        self._mostrar_victoria = False
+        self.estado = ESTADO_GAME_OVER; self.mensaje_texto = "GAME OVER"; self.cuadros_mensaje = 180; self._mostrar_victoria = False
 
     def _registrar_puntuacion_en_perfiles(self):
-        if self.gestor_perfiles.registrar_partida(self.puntuacion_final):
-            pass
+        if self.gestor_perfiles.registrar_partida(self.puntuacion_final): pass
 
     def _registrar_manejadores(self):
         class ControladorJugador:
@@ -233,7 +231,6 @@ class Juego:
                 if j._es_celda_transitable(nx, ny): j.posicion_x, j.posicion_y = nx, ny
                 if (j.posicion_x, j.posicion_y) in j.enemigos and j.potenciador_activo != POTENCIADOR_INVULNERABLE:
                     j.administrador_eventos.publicar(EventoColisionEnemigo((j.posicion_x, j.posicion_y), (j.posicion_x, j.posicion_y)))
-                # Permite avanzar si llega a salida en cualquier momento
                 if j._ha_llegado_a_salida(): j._avanzar_nivel()
 
         class ManejadorPotenciadores:
@@ -363,7 +360,6 @@ class Juego:
                 self.menu.dibujar(); self.vista.actualizar()
             elif self.estado == ESTADO_GAME_OVER:
                 self.vista.limpiar_pantalla((30, 0, 0))
-                # Mostrar mensaje de victoria o derrota
                 titulo = "¡Has ganado!" if getattr(self, "_mostrar_victoria", False) else "GAME OVER"
                 self.vista.dibujar_texto(titulo, 180 if self._mostrar_victoria else 220, 200, 72, (255, 255, 0) if self._mostrar_victoria else (255, 80, 80))
                 self.vista.dibujar_texto(f"Puntaje final: {self.puntuacion_final}", 200, 280, 36, (255, 255, 255))
