@@ -1,43 +1,79 @@
 from personaje import Personaje
 
+
 class Enemigo(Personaje):
     """
     Clase para el enemigo que persigue al jugador en el laberinto.
     """
-    def __init__(self, posicion, incremento_de_velocidad, deteccion, validador_posicion=None):
+    
+    def __init__(self, posicion, velocidad_extra=0, puede_detectar=True, validador_posicion=None):
+        """
+        Inicializa un enemigo.
+        
+        Args:
+            posicion: Posición inicial del enemigo (tupla x, y).
+            velocidad_extra: Pasos extra por turno (entero, por defecto 0).
+            puede_detectar: Si puede detectar al jugador (bool, por defecto True).
+            validador_posicion: Función de validación de posiciones.
+        """
         super().__init__(posicion, validador_posicion)
-        self.incremento_de_velocidad = incremento_de_velocidad  # int, pasos extra por turno
-        self.deteccion = deteccion  # bool, si puede detectar al jugador
+        self.velocidad_extra = velocidad_extra
+        self.puede_detectar = puede_detectar
 
-    def seguir_jugador(self, posicion_jugador):
+    def perseguir_jugador(self, posicion_jugador):
         """
-        Mueve al enemigo hacia la posición del jugador, considerando incremento de velocidad.
+        Mueve al enemigo hacia la posición del jugador.
+        
+        Args:
+            posicion_jugador: Posición actual del jugador (tupla x, y).
         """
-        dx = posicion_jugador[0] - self.posicion[0]
-        dy = posicion_jugador[1] - self.posicion[1]
-        pasos = 1 + self.incremento_de_velocidad  # velocidad relativa
-        nueva_x = self.posicion[0] + (pasos if dx > 0 else -pasos if dx < 0 else 0)
-        nueva_y = self.posicion[1] + (pasos if dy > 0 else -pasos if dy < 0 else 0)
-        # Solo mueve en una dirección por turno (prioridad eje x)
-        if dx != 0:
-            destino = (self.posicion[0] + (pasos if dx > 0 else -pasos), self.posicion[1])
-        elif dy != 0:
-            destino = (self.posicion[0], self.posicion[1] + (pasos if dy > 0 else -pasos))
+        if not self.puede_detectar:
+            return
+        
+        diferencia_x = posicion_jugador[0] - self.posicion[0]
+        diferencia_y = posicion_jugador[1] - self.posicion[1]
+        
+        pasos = 1 + self.velocidad_extra
+        
+        # Calcular nueva posición priorizando movimiento en X
+        if diferencia_x != 0:
+            direccion_x = pasos if diferencia_x > 0 else -pasos
+            nueva_posicion = (self.posicion[0] + direccion_x, self.posicion[1])
+        elif diferencia_y != 0:
+            direccion_y = pasos if diferencia_y > 0 else -pasos
+            nueva_posicion = (self.posicion[0], self.posicion[1] + direccion_y)
         else:
-            destino = self.posicion
-        self.mover(destino)
+            nueva_posicion = self.posicion
+        
+        self.mover(nueva_posicion)
 
-    def detectar_jugador(self, posicion_jugador, rango_deteccion):
+    def esta_en_rango_deteccion(self, posicion_jugador, rango_deteccion):
         """
-        Devuelve True si el jugador está dentro del rango de detección.
+        Verifica si el jugador está dentro del rango de detección.
+        
+        Args:
+            posicion_jugador: Posición del jugador (tupla x, y).
+            rango_deteccion: Distancia máxima de detección (entero).
+            
+        Returns:
+            bool: True si el jugador está en rango, False en caso contrario.
         """
-        dx = abs(posicion_jugador[0] - self.posicion[0])
-        dy = abs(posicion_jugador[1] - self.posicion[1])
-        return dx <= rango_deteccion and dy <= rango_deteccion
+        if not self.puede_detectar:
+            return False
+        
+        distancia_x = abs(posicion_jugador[0] - self.posicion[0])
+        distancia_y = abs(posicion_jugador[1] - self.posicion[1])
+        
+        return distancia_x <= rango_deteccion and distancia_y <= rango_deteccion
 
-    def jugador_atrapado(self, posicion_jugador):
+    def ha_atrapado_jugador(self, posicion_jugador):
         """
-        Devuelve True si el enemigo está en la misma posición que el jugador.
+        Verifica si el enemigo está en la misma posición que el jugador.
+        
+        Args:
+            posicion_jugador: Posición del jugador (tupla x, y).
+            
+        Returns:
+            bool: True si están en la misma posición, False en caso contrario.
         """
         return self.posicion == posicion_jugador
-
