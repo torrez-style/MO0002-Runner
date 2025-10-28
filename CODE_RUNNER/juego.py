@@ -19,6 +19,7 @@ from constantes import (
     CELDA_PARED, CELDA_VACIA, CELDA_ENTRADA, CELDA_SALIDA,
 )
 from salon_de_la_fama import SalonDeLaFama
+from gestor_perfiles import GestorPerfiles
 
 
 class Juego:
@@ -60,8 +61,9 @@ class Juego:
         self.temporizador_paso_jugador = 0
         self.direcciones_presionadas = set()
 
-        # Salón de la fama
+        # Sistemas de gestión
         self.salon = SalonDeLaFama()
+        self.gestor_perfiles = GestorPerfiles()
 
         pygame.init()
         self.reloj = pygame.time.Clock()
@@ -104,6 +106,22 @@ class Juego:
         except Exception as excepcion:
             print(f"Error cargando niveles: {excepcion}")
             return []
+
+    def _recargar_niveles(self):
+        nuevos_niveles = self._cargar_niveles()
+        if nuevos_niveles:
+            self.niveles = nuevos_niveles
+            self.sin_niveles_cargados = False
+            self.nivel_actual = 0
+            self.laberinto = self.niveles[0]["laberinto"]
+            self._configurar_tablero()
+            self._reiniciar_juego()
+            self.vista.titulo = "Maze-Run - Nivel 1 (nuevos niveles cargados)"
+            self.mensaje_texto = f"¡{len(nuevos_niveles)} laberinto(s) cargado(s)!"
+            self.cuadros_mensaje = 180
+        else:
+            self.mensaje_texto = "No se encontraron laberintos válidos"
+            self.cuadros_mensaje = 120
 
     def _configurar_tablero(self):
         filas, columnas = len(self.laberinto), len(self.laberinto[0])
@@ -197,29 +215,15 @@ class Juego:
 
     def _cambiar_a_fin_de_juego(self):
         self.puntuacion_final = self.puntuacion
-        self._registrar_puntuacion_en_salon()
+        self._registrar_puntuacion_en_perfiles()
         self.estado = ESTADO_GAME_OVER
 
-    def _registrar_puntuacion_en_salon(self):
-        # Carga y escribe puntuaciones.json con el nuevo puntaje
-        ruta = "puntuaciones.json" if os.path.exists("puntuaciones.json") else os.path.join("CODE_RUNNER", "puntuaciones.json")
-        try:
-            if os.path.exists(ruta):
-                with open(ruta, "r", encoding="utf-8") as f:
-                    texto = f.read().strip()
-                    datos = json.loads(texto) if texto else []
-            else:
-                datos = []
-        except Exception:
-            datos = []
-        # Pedir nombre simple por consola si no hay UI; por ahora usar un nombre por defecto
-        nombre = os.getenv("PLAYER_NAME", "Jugador")
-        datos.append({"nombre": nombre, "puntuacion": self.puntuacion_final})
-        try:
-            with open(ruta, "w", encoding="utf-8") as f:
-                json.dump(datos, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"No se pudo guardar puntuación: {e}")
+    def _registrar_puntuacion_en_perfiles(self):
+        """Registra la puntuación usando el sistema de perfiles integrado."""
+        if self.gestor_perfiles.registrar_partida(self.puntuacion_final):
+            print(f"Puntuación registrada: {self.puntuacion_final}")
+        else:
+            print("No se pudo registrar la puntuación (sin perfil activo)")
 
     def _registrar_manejadores(self):
         class ControladorJugador:
@@ -471,23 +475,23 @@ class Juego:
             elif self.estado == ESTADO_SALON:
                 self.vista.limpiar_pantalla((0, 0, 50))
                 self.vista.dibujar_texto("Salón de la Fama", 150, 200, 48, (255, 255, 0))
-                # Mostrar top 10 desde puntuaciones.json
-                ruta = "puntuaciones.json" if os.path.exists("puntuaciones.json") else os.path.join("CODE_RUNNER", "puntuaciones.json")
-                try:
-                    if os.path.exists(ruta):
-                        with open(ruta, "r", encoding="utf-8") as f:
-                            texto = f.read().strip()
-                            datos = json.loads(texto) if texto else []
-                    else:
-                        datos = []
-                except Exception:
-                    datos = []
+                
+                # Mostrar ranking desde el gestor de perfiles integrado
+                ranking_global = self.gestor_perfiles.obtener_ranking_global(10)
                 y_posicion = 270
-                for indice, entrada in enumerate(datos[:10]):
-                    if isinstance(entrada, dict) and 'nombre' in entrada and 'puntuacion' in entrada:
-                        self.vista.dibujar_texto(f"{indice + 1}. {entrada['nombre']}: {entrada['puntuacion']}", 120, y_posicion, 24, (255, 255, 255))
-                        y_posicion += 30
-                self.vista.dibujar_texto("ESC: Volver", 120, 550, 32, (200, 200, 200))
+                
+                if ranking_global:
+                    for indice, entrada in enumerate(ranking_global[:10]):
+                        nombre = entrada.get('nombre', 'Desconocido')
+                        puntuacion = entrada.get('puntuacion', 0)
+                        fecha = entrada.get('fecha', 'Sin fecha')
+                        texto = f"{indice + 1}. {nombre}: {puntuacion} ({fecha.split()[0] if ' ' in fecha else fecha})"
+                        self.vista.dibujar_texto(texto, 50, y_posicion, 20, (255, 255, 255))
+                        y_posicion += 25
+                else:
+                    self.vista.dibujar_texto("No hay puntuaciones registradas", 120, y_posicion, 24, (180, 180, 180))
+                
+                self.vista.dibujar_texto("ESC: Volver", 120, 580, 32, (200, 200, 200))
                 self.vista.actualizar()
             elif self.estado == ESTADO_ADMIN:
                 self.vista.limpiar_pantalla((50, 0, 0))
@@ -498,3 +502,16 @@ class Juego:
                 self.vista.actualizar()
 
             self.reloj.tick(self.fps)
+
+    def _cargar_json(self, ruta, por_defecto=None):
+        # Buscar primero en raíz, luego en CODE_RUNNER
+        posibles = [ruta, os.path.join("CODE_RUNNER", ruta)]
+        ruta_existente = next((p for p in posibles if os.path.exists(p)), None)
+        if not ruta_existente:
+            return por_defecto if por_defecto is not None else []
+        try:
+            with open(ruta_existente, "r", encoding="utf-8") as archivo:
+                texto = archivo.read().strip()
+                return json.loads(texto) if texto else (por_defecto if por_defecto is not None else [])
+        except json.JSONDecodeError:
+            return por_defecto if por_defecto is not None else []
