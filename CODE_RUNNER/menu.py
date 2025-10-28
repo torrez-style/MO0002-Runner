@@ -1,23 +1,30 @@
-import pygame
-from evento import EventoSeleccionMenu
-import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog
 import os
 import json
+import tkinter as tk
+from tkinter import filedialog, messagebox, simpledialog
+import pygame
+from evento import EventoSeleccionMenu
+
+# Claves internas del estado/menú (sin tildes)
+OPCION_JUEGO = "JUEGO"
+OPCION_SALON = "SALON_DE_LA_FAMA"
+OPCION_ADMIN = "ADMINISTRACION"
+OPCION_SALIR = "SALIR"
 
 class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
         self.vista = vista
         self.administrador_eventos = administrador_eventos
-        # Corrección de acento y nombre amigable para español
-        self.opciones = ["JUEGO", "SALÓN DE LA FAMA", "ADMINISTRACIÓN", "SALIR"]
-        self.opciones_subadministracion = ["Cargar laberinto", "Reiniciar salón", "Volver"]
+        # Texto mostrado puede llevar tildes, claves internas no
+        self.opciones = [OPCION_JUEGO, OPCION_SALON, OPCION_ADMIN, OPCION_SALIR]
+        self.opciones_subadministracion = ["Cargar laberinto", "Reiniciar salon", "Volver"]
         self.en_subadministracion = False
         self.indice_submenu = 0
         self.indice_principal = 0
         self.fuente_titulo = pygame.font.SysFont(None, 48)
         self.fuente_opcion = pygame.font.SysFont(None, 36)
-        self.contraseña_administrador = "admin2025"
+        # Mover credencial a variable de entorno si se desea
+        self.contrasena_administrador = os.getenv("GAME_ADMIN_PASS", "admin2025")
 
     def manejar_eventos(self, evento):
         if self.en_subadministracion:
@@ -30,7 +37,7 @@ class MenuPrincipal:
                     opcion_seleccionada = self.opciones_subadministracion[self.indice_submenu]
                     if opcion_seleccionada == "Cargar laberinto":
                         self._cargar_laberinto()
-                    elif opcion_seleccionada == "Reiniciar salón":
+                    elif opcion_seleccionada == "Reiniciar salon":
                         self._reiniciar_salon_fama()
                     elif opcion_seleccionada == "Volver":
                         self.en_subadministracion = False
@@ -42,27 +49,28 @@ class MenuPrincipal:
                     self.indice_principal = (self.indice_principal + 1) % len(self.opciones)
                 elif evento.key == pygame.K_RETURN:
                     opcion = self.opciones[self.indice_principal]
-                    if opcion == "ADMINISTRACIÓN":
+                    if opcion == OPCION_ADMIN:
                         if self._autenticar_administrador():
                             self.en_subadministracion = True
                             self.indice_submenu = 0
-                    elif opcion == "JUEGO":
+                    elif opcion == OPCION_JUEGO:
                         if self._verificar_laberintos_disponibles():
-                            self.administrador_eventos.publicar(EventoSeleccionMenu("JUEGO"))
+                            self.administrador_eventos.publicar(EventoSeleccionMenu(OPCION_JUEGO))
                         else:
                             self._mostrar_mensaje_sin_laberintos()
-                    elif opcion == "SALÓN DE LA FAMA":
-                        self.administrador_eventos.publicar(EventoSeleccionMenu("SALÓN_DE_LA_FAMA"))
-                    elif opcion == "SALIR":
-                        self.administrador_eventos.publicar(EventoSeleccionMenu("SALIR"))
+                    elif opcion == OPCION_SALON:
+                        self.administrador_eventos.publicar(EventoSeleccionMenu(OPCION_SALON))
+                    elif opcion == OPCION_SALIR:
+                        self.administrador_eventos.publicar(EventoSeleccionMenu(OPCION_SALIR))
 
     def _autenticar_administrador(self):
+        # En entornos sin tkinter, capturar excepciones
         ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
         try:
-            contraseña_ingresada = simpledialog.askstring("Acceso Administrativo", "Ingrese la contraseña de administrador:", show='*')
-            if contraseña_ingresada == self.contraseña_administrador:
+            contrasena_ingresada = simpledialog.askstring("Acceso Administrativo", "Ingrese la contraseña de administrador:", show='*')
+            if contrasena_ingresada == self.contrasena_administrador:
                 messagebox.showinfo("Acceso Concedido", "Bienvenido al panel administrativo"); return True
-            elif contraseña_ingresada is not None:
+            elif contrasena_ingresada is not None:
                 messagebox.showerror("Acceso Denegado", "Contraseña incorrecta")
             return False
         except Exception:
@@ -72,7 +80,7 @@ class MenuPrincipal:
 
     def _verificar_laberintos_disponibles(self):
         try:
-            ruta = "niveles.json" if os.path.exists("niveles.json") else "CODE_RUNNER/niveles.json"
+            ruta = "niveles.json" if os.path.exists("niveles.json") else os.path.join("CODE_RUNNER", "niveles.json")
             with open(ruta, "r", encoding="utf-8") as archivo:
                 datos = json.load(archivo)
                 return "niveles" in datos and isinstance(datos["niveles"], list) and len(datos["niveles"]) > 0
@@ -81,8 +89,10 @@ class MenuPrincipal:
 
     def _mostrar_mensaje_sin_laberintos(self):
         ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
-        messagebox.showwarning("Sin Laberintos", "No hay laberintos cargados.\n\nPara jugar, debe:\n1. Ir a ADMINISTRACIÓN\n2. Usar contraseña de administrador\n3. Cargar archivos de laberinto")
-        ventana_raiz.destroy()
+        try:
+            messagebox.showwarning("Sin Laberintos", "No hay laberintos cargados.\n\nPara jugar, debe:\n1. Ir a ADMINISTRACION\n2. Usar contraseña de administrador\n3. Cargar archivos de laberinto")
+        finally:
+            ventana_raiz.destroy()
 
     def dibujar(self):
         self.vista.limpiar_pantalla((0, 0, 0))
@@ -99,8 +109,15 @@ class MenuPrincipal:
                 self.vista.pantalla.blit(superficie, (x_opcion, y_opcion))
         else:
             for indice, opcion in enumerate(self.opciones):
+                # Mostrar con tildes donde aplica
+                etiqueta = {
+                    OPCION_JUEGO: "JUEGO",
+                    OPCION_SALON: "SALÓN DE LA FAMA",
+                    OPCION_ADMIN: "ADMINISTRACIÓN",
+                    OPCION_SALIR: "SALIR",
+                }[opcion]
                 color = (255, 255, 0) if indice == self.indice_principal else (200, 200, 200)
-                superficie = self.fuente_opcion.render(opcion, True, color)
+                superficie = self.fuente_opcion.render(etiqueta, True, color)
                 x_opcion = (self.vista.ancho - superficie.get_width()) // 2
                 y_opcion = 200 + indice * 50
                 self.vista.pantalla.blit(superficie, (x_opcion, y_opcion))
@@ -146,7 +163,7 @@ class MenuPrincipal:
                     if not isinstance(fila, list) or len(fila) != ancho:
                         return False
                     for celda in fila:
-                        if not isinstance(celda, int) or celda not in [0,1,2,3]:
+                        if not isinstance(celda, int) or celda not in [0, 1, 2, 3]:
                             return False
                 entrada = nivel["entrada"]; salida = nivel["salida"]
                 if (not isinstance(entrada, list) or len(entrada) != 2 or
