@@ -5,6 +5,13 @@ from constantes import (
 )
 
 
+# Estados del juego (evitar tildes en claves lógicas)
+ESTADO_MENU = "MENU"
+ESTADO_JUEGO = "JUEGO"
+ESTADO_GAME_OVER = "GAME_OVER"
+ESTADO_SALON = "SALON_DE_LA_FAMA"
+ESTADO_ADMIN = "ADMINISTRACION"
+
 class Vista:
     def __init__(self, ancho, alto, titulo=""):
         pygame.display.set_caption(titulo)
