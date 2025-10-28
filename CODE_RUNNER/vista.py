@@ -6,9 +6,9 @@ class Vista:
         self.pantalla = pygame.display.set_mode((ancho, alto))
         self.ancho = ancho
         self.alto = alto
-        self.fuente_hud = pygame.font.SysFont(None, 32)
-        self.offset_x = 0
-        self.offset_y = 0
+        self.fuente_interfaz = pygame.font.SysFont(None, 32)
+        self.desplazamiento_x = 0
+        self.desplazamiento_y = 0
 
     def limpiar_pantalla(self, color):
         self.pantalla.fill(color)
@@ -16,12 +16,12 @@ class Vista:
     def actualizar(self):
         pygame.display.flip()
 
-    def dibujar_laberinto(self, laberinto, tam_celda, color_pared=(80,80,80), color_suelo=(220,220,220), dibujar_rejilla=True):
+    def dibujar_laberinto(self, laberinto, tamaño_celda, color_pared=(80,80,80), color_suelo=(220,220,220), mostrar_rejilla=True):
         for y, fila in enumerate(laberinto):
             for x, celda in enumerate(fila):
-                rx = self.offset_x + x*tam_celda
-                ry = self.offset_y + y*tam_celda
-                rect = pygame.Rect(rx, ry, tam_celda, tam_celda)
+                posicion_x = self.desplazamiento_x + x*tamaño_celda
+                posicion_y = self.desplazamiento_y + y*tamaño_celda
+                rectangulo = pygame.Rect(posicion_x, posicion_y, tamaño_celda, tamaño_celda)
                 if celda == 1:
                     color = color_pared
                 elif celda == 2:
@@ -30,34 +30,34 @@ class Vista:
                     color = (0, 255, 0)
                 else:
                     color = color_suelo
-                pygame.draw.rect(self.pantalla, color, rect)
-                if dibujar_rejilla:
-                    pygame.draw.rect(self.pantalla, (40,40,40), rect, 1)
+                pygame.draw.rect(self.pantalla, color, rectangulo)
+                if mostrar_rejilla:
+                    pygame.draw.rect(self.pantalla, (40,40,40), rectangulo, 1)
 
-    def dibujar_jugador(self, x, y, tam):
-        pygame.draw.circle(self.pantalla, (100, 0, 255), (self.offset_x + x + tam//2, self.offset_y + y + tam//2), tam//2)
+    def dibujar_jugador(self, x, y, tamaño):
+        pygame.draw.circle(self.pantalla, (100, 0, 255), (self.desplazamiento_x + x + tamaño//2, self.desplazamiento_y + y + tamaño//2), tamaño//2)
 
-    def dibujar_enemigo(self, x, y, tam, color=(220, 50, 50)):
-        pygame.draw.circle(self.pantalla, color, (self.offset_x + x + tam//2, self.offset_y + y + tam//2), tam//2)
+    def dibujar_enemigo(self, x, y, tamaño, color=(220, 50, 50)):
+        pygame.draw.circle(self.pantalla, color, (self.desplazamiento_x + x + tamaño//2, self.desplazamiento_y + y + tamaño//2), tamaño//2)
 
-    def dibujar_estrella(self, x, y, tam):
-        rect = pygame.Rect(self.offset_x + x + tam*0.25, self.offset_y + y + tam*0.25, tam*0.5, tam*0.5)
-        pygame.draw.rect(self.pantalla, (255, 215, 0), rect)
+    def dibujar_estrella(self, x, y, tamaño):
+        rectangulo = pygame.Rect(self.desplazamiento_x + x + tamaño*0.25, self.desplazamiento_y + y + tamaño*0.25, tamaño*0.5, tamaño*0.5)
+        pygame.draw.rect(self.pantalla, (255, 215, 0), rectangulo)
 
-    def dibujar_hud(self, vidas, puntos, x=30, y=24):
+    def dibujar_interfaz(self, vidas, puntos, x=30, y=24):
         # Permitir posicionamiento configurable para evitar solapamientos
-        vidas_text = self.fuente_hud.render(f"Vidas: {vidas}", True, (255, 255, 255))
-        puntos_text = self.fuente_hud.render(f"Puntos:  {puntos}", True, (255, 255, 255))
-        self.pantalla.blit(vidas_text, (x, y))
-        self.pantalla.blit(puntos_text, (self.ancho - puntos_text.get_width() - 30, y))
+        texto_vidas = self.fuente_interfaz.render(f"Vidas: {vidas}", True, (255, 255, 255))
+        texto_puntos = self.fuente_interfaz.render(f"Puntos:  {puntos}", True, (255, 255, 255))
+        self.pantalla.blit(texto_vidas, (x, y))
+        self.pantalla.blit(texto_puntos, (self.ancho - texto_puntos.get_width() - 30, y))
 
-    def dibujar_powerup(self, x, y, tam):
-        size = tam * 0.5
-        offset = (tam - size) / 2
-        rect = pygame.Rect(self.offset_x + x + offset, self.offset_y + y + offset, size, size)
-        pygame.draw.rect(self.pantalla, (255, 255, 0), rect)
+    def dibujar_potenciador(self, x, y, tamaño):
+        dimension = tamaño * 0.5
+        desplazamiento = (tamaño - dimension) / 2
+        rectangulo = pygame.Rect(self.desplazamiento_x + x + desplazamiento, self.desplazamiento_y + y + desplazamiento, dimension, dimension)
+        pygame.draw.rect(self.pantalla, (255, 255, 0), rectangulo)
 
-    def dibujar_texto(self, texto, x, y, tam_fuente, color=(255,255,255)):
-        fuente = pygame.font.SysFont(None, tam_fuente)
-        surf = fuente.render(texto, True, color)
-        self.pantalla.blit(surf, (x, y))
+    def dibujar_texto(self, texto, x, y, tamaño_fuente, color=(255,255,255)):
+        fuente = pygame.font.SysFont(None, tamaño_fuente)
+        superficie = fuente.render(texto, True, color)
+        self.pantalla.blit(superficie, (x, y))
