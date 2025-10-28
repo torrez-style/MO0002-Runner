@@ -25,7 +25,7 @@ class EventoSeleccionMenu(Evento):
     def __init__(self, opcion):
         self.opcion = opcion
 
-class EventoGameOver(Evento):
+class EventoFinDeJuego(Evento):
     def __init__(self, puntuacion_final):
         self.puntuacion_final = puntuacion_final
 
