@@ -37,12 +37,10 @@ class Juego:
         else:
             self.sin_niveles_cargados = False
 
-        # Mantener entrada/salida en matriz para render y lógica; usar helper para colisiones
         self.laberinto = self.niveles[0]["laberinto"]
         self.velocidad_enemigos = max(10, self.niveles[0].get("vel_enemigos", 14))
         self.tamano_celda = TAMAÑO_CELDA
 
-        # Estado del jugador y entidades
         self.posicion_x = 1
         self.posicion_y = 1
         self.estrellas = []
@@ -61,7 +59,6 @@ class Juego:
         self.temporizador_paso_jugador = 0
         self.direcciones_presionadas = set()
 
-        # Sistemas de gestión
         self.salon = SalonDeLaFama()
         self.gestor_perfiles = GestorPerfiles()
 
@@ -107,6 +104,21 @@ class Juego:
             print(f"Error cargando niveles: {excepcion}")
             return []
 
+    def _hay_camino_entrada_salida(self, lab):
+        # Busca 2 y 3 en la grilla y usa BFS sobre transitables (0,2,3)
+        entrada = salida = None
+        for y, fila in enumerate(lab):
+            for x, c in enumerate(fila):
+                if c == CELDA_ENTRADA:
+                    entrada = (x, y)
+                elif c == CELDA_SALIDA:
+                    salida = (x, y)
+        if not entrada or not salida:
+            return False
+        grid_bin = [[0 if c != CELDA_PARED else 1 for c in fila] for fila in lab]
+        paso = bfs_siguiente_paso(grid_bin, entrada, salida)
+        return paso is not None
+
     def _recargar_niveles(self):
         nuevos_niveles = self._cargar_niveles()
         if nuevos_niveles:
@@ -114,10 +126,15 @@ class Juego:
             self.sin_niveles_cargados = False
             self.nivel_actual = 0
             self.laberinto = self.niveles[0]["laberinto"]
+            # Sanity check: si no hay camino, cae a emergencia
+            if not self._hay_camino_entrada_salida(self.laberinto):
+                print("Nivel 1 inválido: sin camino entrada→salida. Cargando nivel de emergencia.")
+                self.niveles = [self._crear_nivel_emergencia()]
+                self.laberinto = self.niveles[0]["laberinto"]
             self._configurar_tablero()
             self._reiniciar_juego()
             self.vista.titulo = "Maze-Run - Nivel 1 (nuevos niveles cargados)"
-            self.mensaje_texto = f"¡{len(nuevos_niveles)} laberinto(s) cargado(s)!"
+            self.mensaje_texto = f"¡{len(self.niveles)} laberinto(s) listo(s)!"
             self.cuadros_mensaje = 180
         else:
             self.mensaje_texto = "No se encontraron laberintos válidos"
@@ -169,6 +186,10 @@ class Juego:
             self.nivel_actual = 0
         nivel_actual = self.niveles[self.nivel_actual]
         self.laberinto = nivel_actual["laberinto"]
+        # Sanity: asegurar camino
+        if not self._hay_camino_entrada_salida(self.laberinto):
+            print("Nivel inválido: sin camino. Usando emergencia.")
+            self.laberinto = self._crear_nivel_emergencia()["laberinto"]
         self.posicion_x, self.posicion_y = self._obtener_celda_libre_jugador()
         exclusiones = [(self.posicion_x, self.posicion_y)]
         objetivo_estrellas = nivel_actual.get("estrellas", 3)
@@ -186,6 +207,7 @@ class Juego:
         self.contador_cuadros = 0
         self.potenciador_activo = None
         self.temporizador_potenciador = 0
+        self.congelar_tics = 0
         self.mensaje_texto = ""
         self.cuadros_mensaje = 0
 
@@ -197,7 +219,6 @@ class Juego:
             self.mensaje_texto = f"Faltan {len(self.estrellas)} estrella(s)"
             self.cuadros_mensaje = 60
             return
-        # Si no quedan estrellas y el jugador está en la salida, avanza
         if not self._ha_llegado_a_salida():
             self.mensaje_texto = "Ve a la salida para continuar"
             self.cuadros_mensaje = 60
@@ -219,11 +240,8 @@ class Juego:
         self.estado = ESTADO_GAME_OVER
 
     def _registrar_puntuacion_en_perfiles(self):
-        """Registra la puntuación usando el sistema de perfiles integrado."""
         if self.gestor_perfiles.registrar_partida(self.puntuacion_final):
-            print(f"Puntuación registrada: {self.puntuacion_final}")
-        else:
-            print("No se pudo registrar la puntuación (sin perfil activo)")
+            pass
 
     def _registrar_manejadores(self):
         class ControladorJugador:
@@ -235,18 +253,21 @@ class Juego:
                 j = self.juego
                 if j.vidas <= 0:
                     return
-                delta_x = delta_y = 0
+                dx = dy = 0
                 if evento.direccion == 'arriba':
-                    delta_y = -1
+                    dy = -1
                 elif evento.direccion == 'abajo':
-                    delta_y = 1
+                    dy = 1
                 elif evento.direccion == 'izquierda':
-                    delta_x = -1
+                    dx = -1
                 elif evento.direccion == 'derecha':
-                    delta_x = 1
-                nueva_x, nueva_y = j.posicion_x + delta_x, j.posicion_y + delta_y
-                if j._es_celda_transitable(nueva_x, nueva_y):
-                    j.posicion_x, j.posicion_y = nueva_x, nueva_y
+                    dx = 1
+                nx, ny = j.posicion_x + dx, j.posicion_y + dy
+                if j._es_celda_transitable(nx, ny):
+                    j.posicion_x, j.posicion_y = nx, ny
+                # Chequeo inmediato de colisión tras mover jugador
+                if (j.posicion_x, j.posicion_y) in j.enemigos and j.potenciador_activo != POTENCIADOR_INVULNERABLE:
+                    j.administrador_eventos.publicar(EventoColisionEnemigo((j.posicion_x, j.posicion_y), (j.posicion_x, j.posicion_y)))
 
         class ManejadorPotenciadores:
             def __init__(self, juego, administrador):
@@ -256,6 +277,10 @@ class Juego:
             def notificar(self, evento):
                 self.juego.potenciador_activo = evento.tipo
                 self.juego.temporizador_potenciador = self.juego.duracion_potenciador
+                if evento.tipo == POTENCIADOR_CONGELAR:
+                    self.juego.congelar_tics = self.juego.duracion_potenciador
+                self.juego.mensaje_texto = f"Potenciador: {evento.tipo}"
+                self.juego.cuadros_mensaje = 60
 
         class ControladorEnemigos:
             def __init__(self, juego, administrador):
@@ -265,41 +290,35 @@ class Juego:
                 j = self.juego
                 if j.vidas <= 0:
                     return
+                # Efecto "congelar": pausa movimiento de enemigos
+                if getattr(j, 'congelar_tics', 0) > 0:
+                    j.congelar_tics -= 1
+                    return
                 j.contador_cuadros += 1
                 retraso = max(10, j.velocidad_enemigos)
                 if j.contador_cuadros < retraso:
                     return
                 j.contador_cuadros = 0
                 nuevos_enemigos, ocupadas = [], set()
-                for enemigo_x, enemigo_y in j.enemigos:
+                for ex, ey in j.enemigos:
                     objetivo = (j.posicion_x, j.posicion_y)
-                    siguiente_paso = bfs_siguiente_paso(
-                        [[0 if c != CELDA_PARED else 1 for c in fila] for fila in j.laberinto],
-                        (enemigo_x, enemigo_y),
-                        objetivo,
-                    ) if j.potenciador_activo != POTENCIADOR_INVISIBLE else None
-                    if not siguiente_paso:
-                        delta_x = 1 if j.posicion_x > enemigo_x else -1 if j.posicion_x < enemigo_x else 0
-                        delta_y = 1 if j.posicion_y > enemigo_y else -1 if j.posicion_y < enemigo_y else 0
-                        candidatos = [
-                            (enemigo_x + delta_x, enemigo_y),
-                            (enemigo_x, enemigo_y + delta_y),
-                            (enemigo_x + delta_x, enemigo_y + delta_y),
-                            (enemigo_x - delta_x, enemigo_y),
-                            (enemigo_x, enemigo_y - delta_y),
-                        ]
-                        siguiente_paso = None
-                        for nueva_x, nueva_y in candidatos:
-                            if j._es_celda_transitable(nueva_x, nueva_y) and (nueva_x, nueva_y) not in ocupadas:
-                                siguiente_paso = (nueva_x, nueva_y)
+                    grid_bin = [[0 if c != CELDA_PARED else 1 for c in fila] for fila in j.laberinto]
+                    siguiente = bfs_siguiente_paso(grid_bin, (ex, ey), objetivo) if j.potenciador_activo != POTENCIADOR_INVISIBLE else None
+                    if not siguiente:
+                        dx = 1 if j.posicion_x > ex else -1 if j.posicion_x < ex else 0
+                        dy = 1 if j.posicion_y > ey else -1 if j.posicion_y < ey else 0
+                        candidatos = [(ex + dx, ey), (ex, ey + dy), (ex + dx, ey + dy), (ex - dx, ey), (ex, ey - dy)]
+                        siguiente = None
+                        for nx, ny in candidatos:
+                            if j._es_celda_transitable(nx, ny) and (nx, ny) not in ocupadas:
+                                siguiente = (nx, ny)
                                 break
-                    enemigo_x, enemigo_y = siguiente_paso or (enemigo_x, enemigo_y)
-                    if (enemigo_x, enemigo_y) == (j.posicion_x, j.posicion_y) and j.potenciador_activo != POTENCIADOR_INVULNERABLE:
-                        j.administrador_eventos.publicar(
-                            EventoColisionEnemigo((j.posicion_x, j.posicion_y), (enemigo_x, enemigo_y))
-                        )
-                    ocupadas.add((enemigo_x, enemigo_y))
-                    nuevos_enemigos.append((enemigo_x, enemigo_y))
+                    ex, ey = siguiente or (ex, ey)
+                    # Chequeo de colisión inmediato tras mover enemigo
+                    if (ex, ey) == (j.posicion_x, j.posicion_y) and j.potenciador_activo != POTENCIADOR_INVULNERABLE:
+                        j.administrador_eventos.publicar(EventoColisionEnemigo((j.posicion_x, j.posicion_y), (ex, ey)))
+                    ocupadas.add((ex, ey))
+                    nuevos_enemigos.append((ex, ey))
                 j.enemigos = nuevos_enemigos
 
         class ManejadorColisiones:
@@ -373,65 +392,45 @@ class Juego:
                         if evento.key == pygame.K_ESCAPE:
                             self.estado = ESTADO_MENU
                         elif evento.key == pygame.K_UP:
-                            self.direcciones_presionadas.add('arriba')
-                            self.temporizador_paso_jugador = 0
+                            self.direcciones_presionadas.add('arriba'); self.temporizador_paso_jugador = 0
                         elif evento.key == pygame.K_DOWN:
-                            self.direcciones_presionadas.add('abajo')
-                            self.temporizador_paso_jugador = 0
+                            self.direcciones_presionadas.add('abajo'); self.temporizador_paso_jugador = 0
                         elif evento.key == pygame.K_LEFT:
-                            self.direcciones_presionadas.add('izquierda')
-                            self.temporizador_paso_jugador = 0
+                            self.direcciones_presionadas.add('izquierda'); self.temporizador_paso_jugador = 0
                         elif evento.key == pygame.K_RIGHT:
-                            self.direcciones_presionadas.add('derecha')
-                            self.temporizador_paso_jugador = 0
+                            self.direcciones_presionadas.add('derecha'); self.temporizador_paso_jugador = 0
                     elif evento.type == pygame.KEYUP:
-                        if evento.key == pygame.K_UP:
-                            self.direcciones_presionadas.discard('arriba')
-                        elif evento.key == pygame.K_DOWN:
-                            self.direcciones_presionadas.discard('abajo')
-                        elif evento.key == pygame.K_LEFT:
-                            self.direcciones_presionadas.discard('izquierda')
-                        elif evento.key == pygame.K_RIGHT:
-                            self.direcciones_presionadas.discard('derecha')
+                        if evento.key == pygame.K_UP: self.direcciones_presionadas.discard('arriba')
+                        elif evento.key == pygame.K_DOWN: self.direcciones_presionadas.discard('abajo')
+                        elif evento.key == pygame.K_LEFT: self.direcciones_presionadas.discard('izquierda')
+                        elif evento.key == pygame.K_RIGHT: self.direcciones_presionadas.discard('derecha')
                 elif self.estado == ESTADO_GAME_OVER:
                     if evento.type == pygame.KEYDOWN:
                         if evento.key == pygame.K_ESCAPE:
                             self.estado = ESTADO_MENU
                         elif evento.key == pygame.K_RETURN and not self.sin_niveles_cargados:
-                            self.nivel_actual = 0
-                            self._reiniciar_juego()
-                            self.estado = ESTADO_JUEGO
+                            self.nivel_actual = 0; self._reiniciar_juego(); self.estado = ESTADO_JUEGO
                 elif self.estado == ESTADO_SALON:
                     if evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
                         self.estado = ESTADO_MENU
 
             if self.estado == ESTADO_JUEGO:
-                # Movimiento del jugador con repetición
+                # Movimiento repetido del jugador
                 if self.direcciones_presionadas:
                     self.temporizador_paso_jugador -= 1
                     if self.temporizador_paso_jugador <= 0:
-                        if 'arriba' in self.direcciones_presionadas:
-                            self.administrador_eventos.publicar(EventoMoverJugador('arriba'))
-                        elif 'abajo' in self.direcciones_presionadas:
-                            self.administrador_eventos.publicar(EventoMoverJugador('abajo'))
-                        elif 'izquierda' in self.direcciones_presionadas:
-                            self.administrador_eventos.publicar(EventoMoverJugador('izquierda'))
-                        elif 'derecha' in self.direcciones_presionadas:
-                            self.administrador_eventos.publicar(EventoMoverJugador('derecha'))
+                        if 'arriba' in self.direcciones_presionadas: self.administrador_eventos.publicar(EventoMoverJugador('arriba'))
+                        elif 'abajo' in self.direcciones_presionadas: self.administrador_eventos.publicar(EventoMoverJugador('abajo'))
+                        elif 'izquierda' in self.direcciones_presionadas: self.administrador_eventos.publicar(EventoMoverJugador('izquierda'))
+                        elif 'derecha' in self.direcciones_presionadas: self.administrador_eventos.publicar(EventoMoverJugador('derecha'))
                         self.temporizador_paso_jugador = self.retraso_paso_jugador
 
-                # Recolección de estrellas y potenciadores
+                # Recoger objetos
                 if self.vidas > 0 and (self.posicion_x, self.posicion_y) in self.estrellas:
                     self.administrador_eventos.publicar(EventoRecogerEstrella((self.posicion_x, self.posicion_y)))
                 if self.vidas > 0 and (self.posicion_x, self.posicion_y) in self.potenciadores:
                     self.potenciadores.remove((self.posicion_x, self.posicion_y))
-                    self.administrador_eventos.publicar(
-                        EventoPotenciadorRecogido(random.choice([
-                            POTENCIADOR_INVULNERABLE,
-                            POTENCIADOR_CONGELAR,
-                            POTENCIADOR_INVISIBLE,
-                        ]))
-                    )
+                    self.administrador_eventos.publicar(EventoPotenciadorRecogido(random.choice([POTENCIADOR_INVULNERABLE, POTENCIADOR_CONGELAR, POTENCIADOR_INVISIBLE])))
 
                 # Temporizador de potenciador
                 if self.temporizador_potenciador > 0:
@@ -439,24 +438,20 @@ class Juego:
                     if self.temporizador_potenciador == 0:
                         self.potenciador_activo = None
 
-                if self.cuadros_mensaje > 0:
-                    self.cuadros_mensaje -= 1
+                if self.cuadros_mensaje > 0: self.cuadros_mensaje -= 1
 
-                # Actualizar enemigos
+                # Actualizar enemigos (incluye chequeo de colisión)
                 self.controlador_enemigos.actualizar()
 
-                # Renderizado
+                # Render en orden: laberinto -> estrellas -> powerups -> enemigos -> jugador
                 self.vista.limpiar_pantalla(COLOR_FONDO)
                 nivel_actual = self.niveles[self.nivel_actual]
                 color_pared = tuple(nivel_actual.get("colores", {}).get("pared", COLOR_PARED_DEFAULT))
                 color_suelo = tuple(nivel_actual.get("colores", {}).get("suelo", COLOR_SUELO_DEFAULT))
                 self.vista.dibujar_laberinto(self.laberinto, self.tamano_celda, color_pared, color_suelo)
-                for enemigo_x, enemigo_y in self.enemigos:
-                    self.vista.dibujar_enemigo(enemigo_x * self.tamano_celda, enemigo_y * self.tamano_celda, self.tamano_celda)
-                for estrella_x, estrella_y in self.estrellas:
-                    self.vista.dibujar_estrella(estrella_x * self.tamano_celda, estrella_y * self.tamano_celda, self.tamano_celda)
-                for potenciador_x, potenciador_y in self.potenciadores:
-                    self.vista.dibujar_potenciador(potenciador_x * self.tamano_celda, potenciador_y * self.tamano_celda, self.tamano_celda)
+                for sx, sy in self.estrellas: self.vista.dibujar_estrella(sx * self.tamano_celda, sy * self.tamano_celda, self.tamano_celda)
+                for px, py in self.potenciadores: self.vista.dibujar_potenciador(px * self.tamano_celda, py * self.tamano_celda, self.tamano_celda)
+                for ex, ey in self.enemigos: self.vista.dibujar_enemigo(ex * self.tamano_celda, ey * self.tamano_celda, self.tamano_celda)
                 self.vista.dibujar_jugador(self.posicion_x * self.tamano_celda, self.posicion_y * self.tamano_celda, self.tamano_celda)
                 self.vista.dibujar_texto(f"Estrellas restantes: {len(self.estrellas)}", 20, 20, 24, COLOR_TEXTO_DESTACADO)
                 self.vista.dibujar_interfaz(self.vidas, self.puntuacion, x=20, y=self.desplazamiento_interfaz_y)
@@ -464,8 +459,7 @@ class Juego:
                     self.vista.dibujar_texto(self.mensaje_texto, 120, 60, 32, COLOR_TEXTO)
                 self.vista.actualizar()
             elif self.estado == ESTADO_MENU:
-                self.menu.dibujar()
-                self.vista.actualizar()
+                self.menu.dibujar(); self.vista.actualizar()
             elif self.estado == ESTADO_GAME_OVER:
                 self.vista.limpiar_pantalla((30, 0, 0))
                 self.vista.dibujar_texto("GAME OVER", 220, 200, 72, (255, 80, 80))
@@ -475,43 +469,20 @@ class Juego:
             elif self.estado == ESTADO_SALON:
                 self.vista.limpiar_pantalla((0, 0, 50))
                 self.vista.dibujar_texto("Salón de la Fama", 150, 200, 48, (255, 255, 0))
-                
-                # Mostrar ranking desde el gestor de perfiles integrado
-                ranking_global = self.gestor_perfiles.obtener_ranking_global(10)
-                y_posicion = 270
-                
-                if ranking_global:
-                    for indice, entrada in enumerate(ranking_global[:10]):
-                        nombre = entrada.get('nombre', 'Desconocido')
-                        puntuacion = entrada.get('puntuacion', 0)
-                        fecha = entrada.get('fecha', 'Sin fecha')
-                        texto = f"{indice + 1}. {nombre}: {puntuacion} ({fecha.split()[0] if ' ' in fecha else fecha})"
-                        self.vista.dibujar_texto(texto, 50, y_posicion, 20, (255, 255, 255))
-                        y_posicion += 25
+                ranking = self.gestor_perfiles.obtener_ranking_global(10)
+                y = 270
+                if ranking:
+                    for i, e in enumerate(ranking[:10]):
+                        nombre = e.get('nombre', 'Desconocido'); punt = e.get('puntuacion', 0); fecha = e.get('fecha', '')
+                        texto = f"{i+1}. {nombre}: {punt} ({fecha.split()[0] if fecha else ''})"
+                        self.vista.dibujar_texto(texto, 50, y, 20, (255, 255, 255)); y += 25
                 else:
-                    self.vista.dibujar_texto("No hay puntuaciones registradas", 120, y_posicion, 24, (180, 180, 180))
-                
-                self.vista.dibujar_texto("ESC: Volver", 120, 580, 32, (200, 200, 200))
-                self.vista.actualizar()
+                    self.vista.dibujar_texto("No hay puntuaciones registradas", 120, y, 24, (180, 180, 180))
+                self.vista.dibujar_texto("ESC: Volver", 120, 580, 32, (200, 200, 200)); self.vista.actualizar()
             elif self.estado == ESTADO_ADMIN:
                 self.vista.limpiar_pantalla((50, 0, 0))
                 self.vista.dibujar_texto("Administración", 180, 250, 48, (255, 255, 0))
                 self.vista.dibujar_texto("ESC: Volver", 120, 350, 32, (200, 200, 200))
-                self._recargar_niveles()
-                self.estado = ESTADO_MENU
-                self.vista.actualizar()
+                self._recargar_niveles(); self.estado = ESTADO_MENU; self.vista.actualizar()
 
             self.reloj.tick(self.fps)
-
-    def _cargar_json(self, ruta, por_defecto=None):
-        # Buscar primero en raíz, luego en CODE_RUNNER
-        posibles = [ruta, os.path.join("CODE_RUNNER", ruta)]
-        ruta_existente = next((p for p in posibles if os.path.exists(p)), None)
-        if not ruta_existente:
-            return por_defecto if por_defecto is not None else []
-        try:
-            with open(ruta_existente, "r", encoding="utf-8") as archivo:
-                texto = archivo.read().strip()
-                return json.loads(texto) if texto else (por_defecto if por_defecto is not None else [])
-        except json.JSONDecodeError:
-            return por_defecto if por_defecto is not None else []
