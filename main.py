@@ -162,7 +162,7 @@ def display_welcome_message() -> None:
     """
     
     print(welcome_art)
-    print(f"Version del juego: 2.0.0")
+    print("Version del juego: 2.0.0")
     print(f"Python: {sys.version.split()[0]}")
     print(f"Pygame: {pygame.version.ver}")
     print(f"Resolucion: {settings.SCREEN_WIDTH}x{settings.SCREEN_HEIGHT}")
