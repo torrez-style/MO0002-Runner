@@ -190,6 +190,9 @@ class Juego:
         return self.laberinto[self.posicion_y][self.posicion_x] == CELDA_SALIDA
 
     def _avanzar_nivel(self):
+        # Debe recoger todas las estrellas antes de usar la salida
+        if len(self.estrellas) > 0:
+            self.mensaje_texto = f"Faltan {len(self.estrellas)} estrella(s)"; self.cuadros_mensaje = 60; return
         if not self._ha_llegado_a_salida():
             self.mensaje_texto = "Ve a la salida para continuar"; self.cuadros_mensaje = 60; return
         self._bonificar_estrellas_restantes(self.niveles[self.nivel_actual])
@@ -203,16 +206,12 @@ class Juego:
     def _cambiar_a_victoria(self):
         self.puntuacion_final = self.puntuacion
         self._registrar_puntuacion_en_perfiles()
-        self.estado = ESTADO_GAME_OVER
-        self.mensaje_texto = "¡Has ganado!"; self.cuadros_mensaje = 180
-        self._mostrar_victoria = True
+        self.estado = ESTADO_GAME_OVER; self.mensaje_texto = "¡Has ganado!"; self.cuadros_mensaje = 180; self._mostrar_victoria = True
 
     def _cambiar_a_fin_de_juego(self):
         self.puntuacion_final = self.puntuacion
         self._registrar_puntuacion_en_perfiles()
-        self.estado = ESTADO_GAME_OVER
-        self.mensaje_texto = "GAME OVER"; self.cuadros_mensaje = 180
-        self._mostrar_victoria = False
+        self.estado = ESTADO_GAME_OVER; self.mensaje_texto = "GAME OVER"; self.cuadros_mensaje = 180; self._mostrar_victoria = False
 
     def _registrar_puntuacion_en_perfiles(self):
         if self.gestor_perfiles.registrar_partida(self.puntuacion_final): pass
@@ -230,9 +229,12 @@ class Juego:
                 elif evento.direccion == 'derecha': dx = 1
                 nx, ny = j.posicion_x + dx, j.posicion_y + dy
                 if j._es_celda_transitable(nx, ny): j.posicion_x, j.posicion_y = nx, ny
+                # Chequeo de colisión inmediato tras mover jugador
                 if (j.posicion_x, j.posicion_y) in j.enemigos and j.potenciador_activo != POTENCIADOR_INVULNERABLE:
                     j.administrador_eventos.publicar(EventoColisionEnemigo((j.posicion_x, j.posicion_y), (j.posicion_x, j.posicion_y)))
-                if j._ha_llegado_a_salida(): j._avanzar_nivel()
+                # Avance solo si está en salida y ya no hay estrellas
+                if j._ha_llegado_a_salida() and len(j.estrellas) == 0:
+                    j._avanzar_nivel()
 
         class ManejadorPotenciadores:
             def __init__(self, juego, administrador): self.juego = juego; administrador.registrar(EventoPotenciadorRecogido, self)
@@ -262,6 +264,7 @@ class Juego:
                         for nx, ny in candidatos:
                             if j._es_celda_transitable(nx, ny) and (nx, ny) not in ocupadas: siguiente = (nx, ny); break
                     ex, ey = siguiente or (ex, ey)
+                    # Chequeo de colisión inmediato tras mover enemigo
                     if (ex, ey) == (j.posicion_x, j.posicion_y) and j.potenciador_activo != POTENCIADOR_INVULNERABLE:
                         j.administrador_eventos.publicar(EventoColisionEnemigo((j.posicion_x, j.posicion_y), (ex, ey)))
                     ocupadas.add((ex, ey)); nuevos.append((ex, ey))
@@ -280,6 +283,9 @@ class Juego:
                 j = self.juego
                 if evento.posicion in j.estrellas:
                     j.estrellas.remove(evento.posicion); j.puntuacion += PUNTOS_POR_ESTRELLA
+                    # Si recogió la última y está en la salida, permite pasar de inmediato
+                    if not j.estrellas and j._ha_llegado_a_salida():
+                        j._avanzar_nivel()
 
         class ManejadorMenu:
             def __init__(self, juego, administrador): self.juego = juego; administrador.registrar(EventoSeleccionMenu, self)
@@ -344,6 +350,10 @@ class Juego:
 
                 self.controlador_enemigos.actualizar()
 
+                # Chequeo de colisión de refuerzo antes de dibujar (evita falsos negativos por cruce)
+                if (self.posicion_x, self.posicion_y) in self.enemigos and self.potenciador_activo != POTENCIADOR_INVULNERABLE:
+                    self.administrador_eventos.publicar(EventoColisionEnemigo((self.posicion_x, self.posicion_y), (self.posicion_x, self.posicion_y)))
+
                 self.vista.limpiar_pantalla(COLOR_FONDO)
                 nivel_actual = self.niveles[self.nivel_actual]
                 color_pared = tuple(nivel_actual.get("colores", {}).get("pared", COLOR_PARED_DEFAULT))
@@ -384,4 +394,3 @@ class Juego:
                 self._recargar_niveles(); self.estado = ESTADO_MENU; self.vista.actualizar()
 
             self.reloj.tick(self.fps)
-}},
