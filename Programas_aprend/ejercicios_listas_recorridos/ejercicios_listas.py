@@ -2,18 +2,16 @@
 Imprimir todos los elementos de una lista
 Crea una lista de 5 nombres y recórrela con un bucle for para imprimir cada nombre.
 
-
+"""
 
 lista=["Juan", "Pedro", "Anna", "Wendy", "Marcos"]
 
 for i in lista:
     print(i)
-"""
 
 """
 Sumar elementos numéricos
 Dada una lista de números, recorre la lista y muestra la suma total de sus elementos.
-
 """
 numeros=[1,2,3,4,5,6]
 contador=0
@@ -23,10 +21,15 @@ for i in numeros:
     
 print(f"La suma total es: {contador}")
 
+
+
 """
 3.Encontrar el valor máximo
 Dada una lista de enteros, recórrela y encuentra el número mayor (sin usar la función max).
+"""
 
+
+"""
 4.Contar elementos pares
 Dada una lista de números, recórrela y cuenta cuántos son pares.
 
