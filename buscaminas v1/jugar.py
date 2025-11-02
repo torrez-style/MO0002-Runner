@@ -54,8 +54,13 @@ class Jugar:
             r, c = self._capturar_movimiento()
             
             # 3. Revelar la celda seleccionada
-            self._tablero.revelar_celda(r, c)
+            
+            "Se implemneto resultado="
+            resultado  = self._tablero.revelar_celda(r, c)
+            if not resultado:
+                print("Esta posición ya fue revelada.\nIntenta otra coordenada.")
             
         # Al salir del bucle (juego terminado por victoria o derrota)
         self._tablero.imprimir_tablero() # Mostrar el tablero final
         print("\nFin del juego. ¡Gracias por jugar!")
+    
