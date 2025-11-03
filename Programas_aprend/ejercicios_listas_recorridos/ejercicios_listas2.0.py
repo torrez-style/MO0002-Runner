@@ -61,21 +61,21 @@ Dada una lista de palabras, muestra cuántas veces aparece cada palabra usando u
 
 Dada una lista numérica, calcula la suma de los elementos en índices pares y la suma de los de índices impares, por separado.
 """
-numeros=[1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100]
+#numeros=[1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100]
 
-suma_pares=0
-suma_impares=0
+#suma_pares=0
+#suma_impares=0
 
 
-for i in range(len(numeros)):
-    if i%2==0:
-        suma_pares += numeros[i]
+#for i in range(len(numeros)):
+    #if i%2==0:
+        #suma_pares += numeros[i]
         
-    else:
-        suma_impares +=numeros[i]
+    #else:
+        #suma_impares +=numeros[i]
 
-print(f"La suma de los indisces pares es: {suma_pares}")
-print(f"La suma de los indisces impares es: {suma_impares}")
+#print(f"La suma de los indisces pares es: {suma_pares}")
+#print(f"La suma de los indisces impares es: {suma_impares}")
 
 
 
@@ -83,7 +83,25 @@ print(f"La suma de los indisces impares es: {suma_impares}")
 5.  Filtrar y crear lista de números mayores a un valor dado por el usuario
 
 Solicita al usuario un número y crea una lista con los elementos mayores a ese valor.
+"""
 
+numeros=[12,40,20,1,2,5,6,7,8,100,76]
+
+x=int(input("Introduzca un númeo valido:    "))
+mayores=[]
+
+for n in numeros:
+    if n>x:
+        mayores.append(n)
+        print(f"Los números mayores a: {x} son: {mayores}")
+        
+    else:
+        print("No hay números mayores a ese valor!!!!")
+        break
+    
+
+
+"""
 
 6.  Obtener el segundo elemento más grande de una lista
 
