@@ -1,0 +1,9 @@
+[
+  {
+    "id": 1,
+    "nombre": "Jugador1",
+    "fecha_creacion": "2025-10-28",
+    "partidas_jugadas": 0,
+    "mejor_puntuacion": 0
+  }
+]
