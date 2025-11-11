@@ -4,7 +4,7 @@ Implementa un sistema de eventos basado en el patrón Observer.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Type, Any
+from typing import List, Dict, Type
 
 
 class Evento(ABC):

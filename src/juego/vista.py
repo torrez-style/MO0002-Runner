@@ -108,11 +108,13 @@ class Vista:
             t_input = self.fuente_interfaz.render(texto + "_", True, (255, 255, 255))
             self.pantalla.blit(t_input, (box_x + 20, box_y + 120))
 
-            pygame.display.flip(); clock.tick(30)
+            pygame.display.flip()
+            clock.tick(30)
 
     def confirmar(self, titulo, mensaje):
         """Confirmación simple (True/False)."""
-        clock = pygame.time.Clock(); seleccionado = 0  # 0=Sí, 1=No
+        clock = pygame.time.Clock()
+        seleccionado = 0  # 0=Sí, 1=No
         while True:
             for e in pygame.event.get():
                 if e.type == pygame.QUIT:
@@ -147,4 +149,5 @@ class Vista:
                 t_opt = self.fuente_mediana.render(txt, True, color)
                 self.pantalla.blit(t_opt, (box_x + 150 + i * 140, box_y + 140))
 
-            pygame.display.flip(); clock.tick(30)
+            pygame.display.flip()
+            clock.tick(30)

@@ -1,3 +1,1 @@
-from .juego import Juego
-
-__all__ = ["Juego"]
+__all__ = []
