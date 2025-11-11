@@ -163,12 +163,12 @@ Dadas dos listas del mismo tamaño, recórralas y concatenen (como cadenas) los 
 #print(f"Lista combinada:\n{cadena}")
 
 #Solución usando list comprehension
-lista1=["a","b","c","d"]
-lista2=["x","y","z","w"]
+#lista1=["a","b","c","d"]
+#lista2=["x","y","z","w"]
 
-cadena=[lista1[i]+lista2[i] for i in range(len(lista1))]
+#cadena=[lista1[i]+lista2[i] for i in range(len(lista1))]
 
-print(f"Lista combinada:\n{cadena}")
+#print(f"Lista combinada:\n{cadena}")
 
 
 #Usando zip()

@@ -85,19 +85,16 @@ Dada una lista numérica, calcula la suma de los elementos en índices pares y l
 Solicita al usuario un número y crea una lista con los elementos mayores a ese valor.
 """
 
-numeros=[12,40,20,1,2,5,6,7,8,100,76]
+#numeros=[12,40,20,1,2,5,6,7,8,100,76]
 
-x=int(input("Introduzca un númeo valido:    "))
-mayores=[]
+#x=int(input("Introduzca un númeo valido:    "))
+#mayores=[]
 
-for n in numeros:
-    if n>x:
-        mayores.append(n)
-        print(f"Los números mayores a: {x} son: {mayores}")
+#for n in numeros:
+    #if n>x:
+        #mayores.append(n)
+#print(f"Los números mayores a: {x} son: {mayores}")
         
-    else:
-        print("No hay números mayores a ese valor!!!!")
-        break
     
 
 
@@ -107,21 +104,95 @@ for n in numeros:
 
 Dada una lista de enteros, encuentra el segundo mayor sin ordenar la lista.
 
+"""
+#numeros=[10,4,8,1,30,28,49,29,0]
+
+#mayor=numeros[0]
+
+
+#for n in numeros:
+    #if n > mayor:
+        #mayor =n 
+        
+#segundo_mayor=None 
+
+#for n in numeros:
+    #if n != mayor:
+        #if segundo_mayor is None or n > segundo_mayor:
+            #segundo_mayor = n
+            
+#print(f"El elemento mayor es: {mayor}")
+#print(f"El segundo elemento mayor es: {segundo_mayor}")
+"""
+
 
 7.  Crear una lista con la suma de dos listas
 
 Dadas dos listas de números del mismo tamaño, crea una lista con la suma de los elementos en posiciones correspondientes.
+"""
 
+#lista1=[1,2,3,4]
+#lista2=[10,20,30,40]
+#suma=[]
+
+
+#for i in range(len(lista1)):
+    #suma.append(lista1[i] + lista2[i])
+    
+#print(suma)
+
+
+
+"""
 8.  Todas las cadenas en mayúsculas
 
 Dada una lista de palabras, recorre la lista y crea una nueva con todas las palabras en mayúsculas.
+"""
+#palabras=["sol", "luna", "estrellas", "galaxia"]
+#ayusculas=[]
 
+#for p in palabras:
+    #mayusculas.append(p.upper())
+#print(mayusculas)
+
+
+
+"""
 9.  Eliminar todos los elementos que contengan una vocal específica
 
 Dada una lista de palabras y una vocal dada por el usuario, crea una nueva lista excluyendo las palabras que contengan esa vocal.
+"""
 
+#palabras=["palabras", "minuscula", "mayuscula", "derivada", "integral", "verctor"]
+
+
+#vocal= input("Ingrese la vocal que desea filtrar.   ").lower()
+
+#sin_vocal=[]
+
+
+#for p in palabras:
+    #if vocal not in p: 
+        #sin_vocal.append(p)
+
+#print(f"Lista sin palabras que contienen la vocal:  {vocal}")
+#print(sin_vocal)
+
+
+""""
 10. Encontrar el índice de todos los elementos iguales a un valor dado
 
 Dada una lista y un valor solicitado al usuario, encuentra y muestra los índices en los que aparece ese valor.
 
 """
+
+#lista=["agua", "amor", "solo", "gladiador", "pájaro", "carro", "luna", "ferroso"]
+#valor= input("Introduzca el valor a buscar:     ")
+
+#indices=[]
+
+#for i in range(len(lista)):
+    #if lista[i]==valor:
+        #indices.append(i)
+        
+#print(f"El valor {valor} aparece en los índices: ", indices)
