@@ -1,9 +1,0 @@
-Este es un archivo de prueba creado desde el chat.
-Fecha: 20 de noviembre de 2025
-Hora: 4:05 PM CST
-
-Este archivo demuestra la capacidad de crear y modificar archivos
-directamente en tu repositorio de GitHub desde el chat.
-
-Proyecto: MO0002-Runner
-Usuario: torrez-style
