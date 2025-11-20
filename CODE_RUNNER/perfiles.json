@@ -1,1 +1,9 @@
-[]
+{
+    "usuarios": [
+        {
+            "nombre": "MANYEL",
+            "puntuacion_maxima": 0,
+            "partidas_jugadas": 0
+        }
+    ]
+}
