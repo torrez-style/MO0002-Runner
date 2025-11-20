@@ -1,26 +1,22 @@
 class Personaje:
-    """Clase base para todos los personajes del juego"""
+    def __init__(self, posicion, validador_posicion=None):
+        if not (isinstance(posicion, tuple) and len(posicion) == 2 and
+                all(isinstance(coord, int) for coord in posicion)):
+            raise ValueError("La posición debe ser una tupla de dos enteros (x, y).")
+        self._posicion = posicion
+        self._validador_posicion = validador_posicion
 
-    def __init__(self, x: int, y: int, nombre: str = "Personaje"):
-        self.posicion_x = x
-        self.posicion_y = y
-        self.nombre = nombre
-
-    def mover(self, nueva_x: int, nueva_y: int) -> bool:
-        """Intenta mover el personaje a una nueva posición"""
-        if self._validar_posicion(nueva_x, nueva_y):
-            self.posicion_x = nueva_x
-            self.posicion_y = nueva_y
-            return True
-        return False
-
-    def _validar_posicion(self, x: int, y: int) -> bool:
-        """Valida que la posición sea válida"""
-        return isinstance(x, int) and isinstance(y, int) and x >= 0 and y >= 0
-
-    def obtener_posicion(self) -> tuple:
-        """Retorna la posición actual del personaje"""
-        return (self.posicion_x, self.posicion_y)
-
-    def __repr__(self) -> str:
-        return f"{self.nombre} en ({self.posicion_x}, {self.posicion_y})"
+    @property
+    def posicion(self):
+        #Devuelve la posición actual del personaje.
+        return self._posicion
+    def mover(self, nueva_posicion):
+        if not (isinstance(nueva_posicion, tuple) and len(nueva_posicion) == 2 and
+                all(isinstance(coord, int) for coord in nueva_posicion)):
+            raise ValueError("La nueva posición debe ser una tupla de dos enteros (x, y).")
+        if self._validador_posicion:
+            if not self._validador_posicion(nueva_posicion):
+                print("Movimiento bloqueado: posición inválida (muro o fuera de límites).")
+                return False
+        self._posicion = nueva_posicion
+        return True
