@@ -138,7 +138,8 @@ class MenuPrincipal:
             ventana_raiz.destroy()
 
     def _crear_perfil(self):
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
+        ventana_raiz = tk.Tk()
+        ventana_raiz.withdraw()
         try:
             nombre = simpledialog.askstring("Crear Perfil", "Ingrese nombre del nuevo perfil:")
             if nombre:
@@ -156,7 +157,8 @@ class MenuPrincipal:
             self._mostrar_mensaje("Debe existir al menos un perfil")
             return
         
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
+        ventana_raiz = tk.Tk()
+        ventana_raiz.withdraw()
         try:
             opciones_texto = "\n".join([f"{p['id']}: {p['nombre']}" for p in perfiles])
             seleccion = simpledialog.askstring("Eliminar Perfil", f"Perfiles disponibles:\n{opciones_texto}\n\nIngrese ID del perfil a eliminar:")
@@ -172,14 +174,16 @@ class MenuPrincipal:
             ventana_raiz.destroy()
 
     def _mostrar_mensaje(self, mensaje):
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
+        ventana_raiz = tk.Tk()
+        ventana_raiz.withdraw()
         try:
             messagebox.showinfo("Información", mensaje)
         finally:
             ventana_raiz.destroy()
 
     def _autenticar_administrador(self):
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
+        ventana_raiz = tk.Tk()
+        ventana_raiz.withdraw()
         try:
             contrasena_ingresada = simpledialog.askstring("Acceso Administrativo", "Ingrese la contraseña de administrador:", show='*')
             if contrasena_ingresada == self.contrasena_administrador:
@@ -202,7 +206,8 @@ class MenuPrincipal:
             return False
 
     def _mostrar_mensaje_sin_laberintos(self):
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
+        ventana_raiz = tk.Tk()
+        ventana_raiz.withdraw()
         try:
             messagebox.showwarning("Sin Laberintos", "No hay laberintos cargados.\n\nPara jugar, debe:\n1. Ir a ADMINISTRACION\n2. Usar contraseña de administrador\n3. Cargar archivos de laberinto")
         finally:
