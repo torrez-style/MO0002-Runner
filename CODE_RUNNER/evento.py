@@ -2,8 +2,6 @@
 class Evento:
     pass
 
-class EventoSalir(Evento):
-    pass
 
 class EventoMoverJugador(Evento):
     def __init__(self,direccion):
@@ -22,17 +20,11 @@ class EventoSeleccionMenu(Evento):
     def __init__(self,opcion):
         self.opcion=opcion
 
-class EventoFinDeJuego(Evento):
-    def __init__(self,puntuacion_final):
-        self.puntuacion_final=puntuacion_final
 
 class EventoPowerUpAgarrado(Evento):
     def __init__(self,tipo):
         self.tipo=tipo  # 'invulnerable', 'congelar', 'invisible'
 
-class EventoSalirNivel(Evento):
-#Evento que se dispara cuando el jugador llega a la salida del nivel
-    pass
 
 class AdministradorDeEventos:
     def __init__(self):
