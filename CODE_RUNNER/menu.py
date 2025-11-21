@@ -1,5 +1,4 @@
 import pygame
-import os
 import json
 from evento import EventoSeleccionMenu
 from salon_de_la_fama import SalonDeLaFama
@@ -13,7 +12,6 @@ class MenuPrincipal:
             "Crear usuario",
             "Eliminar usuario",
             "Listar usuarios",
-            "Cargar laberinto",
             "Reiniciar salón",
             "Volver",
         ]
@@ -88,11 +86,6 @@ class MenuPrincipal:
                         )
                     elif opcion_seleccionada == "Listar usuarios":
                         self.listar_usuarios = True
-                    elif opcion_seleccionada == "Cargar laberinto":
-                        self._iniciar_input(
-                            "Ruta del archivo de laberinto (JSON)",
-                            self._cargar_laberinto,
-                        )
                     elif opcion_seleccionada == "Reiniciar salón":
                         self._reiniciar_salon_fama()
                     elif opcion_seleccionada == "Volver":
@@ -113,15 +106,9 @@ class MenuPrincipal:
                         self.en_subadministracion = True
                         self.indice_submenu = 0
                     elif opcion == "JUEGO":
-                        if self._verificar_laberintos_disponibles():
-                            self.administrador_eventos.publicar(
-                                EventoSeleccionMenu("JUEGO")
-                            )
-                        else:
-                            self._mostrar_mensaje(
-                                "No hay laberintos cargados. Ve a ADMINISTRACIÓN y carga un archivo.",
-                                "warning",
-                            )
+                        self.administrador_eventos.publicar(
+                            EventoSeleccionMenu("JUEGO")
+                        )
                     elif opcion == "SALÓN DE LA FAMA":
                         self.mostrar_salon = True
                     elif opcion == "SALIR":
@@ -326,83 +313,6 @@ class MenuPrincipal:
         self.eliminar_en_progreso = False
         self.pide_contraseña = False
         self.usuario_a_eliminar = None
-
-    def _verificar_laberintos_disponibles(self):
-        try:
-            ruta = (
-                "niveles.json"
-                if os.path.exists("niveles.json")
-                else "CODE_RUNNER/niveles.json"
-            )
-            with open(ruta, "r", encoding="utf-8") as archivo:
-                datos = json.load(archivo)
-            return (
-                "niveles" in datos
-                and isinstance(datos["niveles"], list)
-                and len(datos["niveles"]) > 0
-            )
-        except Exception:
-            return False
-
-    def _cargar_laberinto(self, ruta_json):
-        if not ruta_json or not os.path.exists(ruta_json):
-            self._mostrar_mensaje("No se encontró el archivo especificado.", "error")
-            return
-        try:
-            with open(ruta_json, "r", encoding="utf-8") as archivo:
-                datos = json.load(archivo)
-            if self._validar_estructura_laberinto(datos):
-                with open("niveles.json", "w", encoding="utf-8") as archivo_salida:
-                    json.dump(datos, archivo_salida, indent=2, ensure_ascii=False)
-                self._mostrar_mensaje(
-                    f"Se cargaron {len(datos['niveles'])} laberinto(s) correctamente.",
-                    "info",
-                )
-            else:
-                self._mostrar_mensaje(
-                    "Formato incorrecto. Requiere clave 'niveles', matriz rectangular y valores válidos.",
-                    "error",
-                )
-        except json.JSONDecodeError:
-            self._mostrar_mensaje("El archivo seleccionado no es JSON válido.", "error")
-        except Exception as excepcion:
-            self._mostrar_mensaje(f"Error: {excepcion}", "error")
-
-    def _validar_estructura_laberinto(self, datos):
-        try:
-            if not isinstance(datos, dict) or "niveles" not in datos:
-                return False
-            niveles = datos["niveles"]
-            if not isinstance(niveles, list) or len(niveles) == 0:
-                return False
-            for nivel in niveles:
-                if not isinstance(nivel, dict):
-                    return False
-                for campo in ["nombre", "laberinto", "entrada", "salida"]:
-                    if campo not in nivel:
-                        return False
-                laberinto = nivel["laberinto"]
-                if not isinstance(laberinto, list) or len(laberinto) == 0:
-                    return False
-                ancho = len(laberinto[0])
-                for fila in laberinto:
-                    if not isinstance(fila, list) or len(fila) != ancho:
-                        return False
-                    for celda in fila:
-                        if not isinstance(celda, int) or celda not in [0, 1, 2, 3]:
-                            return False
-                entrada = nivel["entrada"]
-                salida = nivel["salida"]
-                if (
-                    not isinstance(entrada, list)
-                    or len(entrada) != 2
-                    or not isinstance(salida, list)
-                    or len(salida) != 2
-                ):
-                    return False
-            return True
-        except Exception:
-            return False
 
     def _reiniciar_salon_fama(self):
         try:
