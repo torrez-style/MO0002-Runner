@@ -1,9 +1,8 @@
 import pygame
-from evento import EventoSeleccionMenu
 import os
 import json
+from evento import EventoSeleccionMenu
 from salon_de_la_fama import SalonDeLaFama
-
 
 class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
@@ -34,8 +33,10 @@ class MenuPrincipal:
         self.salon = SalonDeLaFama()
         self.mostrar_salon = False
         self.usuario_actual = None
-        # Variables para el proceso de eliminación con contraseña
+        # Nuevas variables para proceso de eliminación
+        self.eliminar_en_progreso = False
         self.usuario_a_eliminar = None
+        self.pide_contraseña = False
         self.PASSWORD_ADMIN = "admin2025"
 
     def manejar_eventos(self, evento):
@@ -47,33 +48,19 @@ class MenuPrincipal:
                     self.input_activo = False
                     self.texto_input = ""
                     self.input_callback = None
+                    self.pide_contraseña = False
                 elif evento.key == pygame.K_BACKSPACE:
                     self.texto_input = self.texto_input[:-1]
                 elif evento.key == pygame.K_ESCAPE:
                     self.input_activo = False
                     self.texto_input = ""
                     self.input_callback = None
-                    self.usuario_a_eliminar = None  # Cancelar proceso de eliminación
+                    self.pide_contraseña = False
+                    self.usuario_a_eliminar = None
                 else:
                     char = evento.unicode
                     if char.isprintable():
                         self.texto_input += char
-            return
-
-        if self.mostrar_salon:
-            if evento.type == pygame.KEYDOWN and evento.key in [
-                pygame.K_RETURN,
-                pygame.K_ESCAPE,
-            ]:
-                self.mostrar_salon = False
-            return
-
-        if self.listar_usuarios:
-            if evento.type == pygame.KEYDOWN and evento.key in [
-                pygame.K_RETURN,
-                pygame.K_ESCAPE,
-            ]:
-                self.listar_usuarios = False
             return
 
         if self.en_subadministracion:
@@ -95,8 +82,9 @@ class MenuPrincipal:
                             "Nombre del usuario a crear", self._crear_usuario
                         )
                     elif opcion_seleccionada == "Eliminar usuario":
+                        self.eliminar_en_progreso = True
                         self._iniciar_input(
-                            "Nombre del usuario a eliminar", self._iniciar_eliminacion_usuario
+                            "Nombre del usuario a eliminar", self._fi_eliminacion_usuario
                         )
                     elif opcion_seleccionada == "Listar usuarios":
                         self.listar_usuarios = True
@@ -195,11 +183,10 @@ class MenuPrincipal:
         pregunta = fuente.render(self.mensaje, True, (255, 255, 255))
         self.vista.pantalla.blit(pregunta, (rect.left + 30, rect.top + 30))
 
-        # Ocultar la contraseña con asteriscos si estamos en el paso de verificación
+        # Ocultar la contraseña con asteriscos si estamos en el segundo paso
         texto_a_mostrar = self.texto_input
-        if self.usuario_a_eliminar is not None and "contraseña" in self.mensaje.lower():
+        if self.pide_contraseña:
             texto_a_mostrar = "*" * len(self.texto_input)
-        
         entrada = fuente.render(texto_a_mostrar, True, (200, 255, 200))
         self.vista.pantalla.blit(entrada, (rect.left + 30, rect.top + 70))
 
@@ -209,7 +196,6 @@ class MenuPrincipal:
         self.vista.pantalla.blit(instruccion, (rect.left + 30, rect.top + 110))
 
     def _dibujar_salon_fama(self):
-        """Muestra el ranking global del salón de la fama."""
         fondo = pygame.Surface((700, 450))
         fondo.fill((42, 42, 52))
         rect = fondo.get_rect()
@@ -307,37 +293,38 @@ class MenuPrincipal:
         self._guardar_usuarios()
         self._mostrar_mensaje(f"Usuario '{nombre}' creado correctamente.", "info")
 
-    def _iniciar_eliminacion_usuario(self, nombre):
-        """Primer paso: verifica que el usuario existe y solicita contraseña"""
+    def _fi_eliminacion_usuario(self, nombre):
         nombre = nombre.strip().upper()
         if nombre not in self.usuarios:
             self._mostrar_mensaje(f"El usuario '{nombre}' no existe.", "error")
+            self.eliminar_en_progreso = False
             self.usuario_a_eliminar = None
             return
-        
-        # Guardar el nombre del usuario a eliminar y pedir contraseña
         self.usuario_a_eliminar = nombre
+        self.pide_contraseña = True
         self._iniciar_input(
-            f"Ingrese contraseña para eliminar '{nombre}'",
-            self._verificar_password_y_eliminar
+            f"Ingrese contraseña para eliminar '{nombre}'", self._verificar_password_y_eliminar
         )
 
     def _verificar_password_y_eliminar(self, password):
-        """Segundo paso: verifica la contraseña y elimina el usuario"""
         if self.usuario_a_eliminar is None:
             self._mostrar_mensaje("Error: No hay usuario seleccionado.", "error")
+            self.eliminar_en_progreso = False
+            self.pide_contraseña = False
             return
-        
         if password.strip() != self.PASSWORD_ADMIN:
             self._mostrar_mensaje("Contraseña incorrecta. Eliminación cancelada.", "error")
+            self.eliminar_en_progreso = False
+            self.pide_contraseña = False
             self.usuario_a_eliminar = None
             return
-        
-        # Contraseña correcta, proceder con la eliminación
+        # Contraseña correcta, eliminar usuario
         nombre = self.usuario_a_eliminar
         self.usuarios = [u for u in self.usuarios if u != nombre]
         self._guardar_usuarios()
         self._mostrar_mensaje(f"Usuario '{nombre}' eliminado correctamente.", "info")
+        self.eliminar_en_progreso = False
+        self.pide_contraseña = False
         self.usuario_a_eliminar = None
 
     def _verificar_laberintos_disponibles(self):
