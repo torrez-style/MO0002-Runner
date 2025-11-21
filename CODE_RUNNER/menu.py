@@ -5,7 +5,7 @@ from lista_usuarios import ListaUsuarios
 
 class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
-                self.vista = vista
+                        self.vista = vista
         self.administrador_eventos = administrador_eventos
         self.salon = SalonDeLaFama()
         self.lista_usuarios = ListaUsuarios()
