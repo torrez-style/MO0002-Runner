@@ -5,7 +5,7 @@ from lista_usuarios import ListaUsuarios
 
 class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
-                        self.vista = vista
+        self.vista = vista
         self.administrador_eventos = administrador_eventos
         self.salon = SalonDeLaFama()
         self.lista_usuarios = ListaUsuarios()
@@ -27,7 +27,6 @@ class MenuPrincipal:
         if contrasena != self.contrasena_admin:
             print("Contraseña incorrecta.")
             return
-
         while True:
             print("\n=== GESTIÓN DE USUARIOS ===")
             print("1. Crear usuario")
@@ -35,14 +34,12 @@ class MenuPrincipal:
             print("3. Listar usuarios")
             print("4. Volver")
             opcion = input("Selecciona una opción: ").strip()
-
             if opcion == "1":
                 nombre = input("Ingresa el nombre de usuario: ").strip().upper()
                 if self.lista_usuarios.crear_usuario(nombre):
                     print(f"Usuario '{nombre}' creado exitosamente.")
                 else:
                     print(f"El usuario '{nombre}' ya existe.")
-
             elif opcion == "2":
                 nombre = (
                     input("Ingresa el nombre de usuario a eliminar: ").strip().upper()
@@ -52,13 +49,10 @@ class MenuPrincipal:
                     self.salon.eliminar_puntuaciones_usuario(nombre)
                 else:
                     print(f"El usuario '{nombre}' no existe.")
-
             elif opcion == "3":
                 self.lista_usuarios.listar_todos()
-
             elif opcion == "4":
                 break
-
             else:
                 print("Opción inválida.")
 
