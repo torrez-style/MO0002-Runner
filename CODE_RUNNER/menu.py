@@ -2,12 +2,13 @@ import pygame
 from evento import EventoSeleccionMenu
 import os
 import json
+from logros import GestorLogros
 
 class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
         self.vista = vista
         self.administrador_eventos = administrador_eventos
-        self.opciones = ["JUEGO", "SALÓN DE LA FAMA", "ADMINISTRACIÓN", "SALIR"]
+        self.opciones = ["JUEGO", "SALÓN DE LA FAMA", "LOGROS", "ADMINISTRACIÓN", "SALIR"]
         self.opciones_subadministracion = [
             "Crear usuario", "Eliminar usuario", "Listar usuarios",
             "Cargar laberinto", "Reiniciar salón", "Volver"
@@ -25,6 +26,9 @@ class MenuPrincipal:
         self.input_callback = None
         self.listar_usuarios = False
         self.usuarios = self._leer_usuarios()
+        # Logros
+        self.visualizar_logros = False
+        self.logros_usuario = GestorLogros(self.usuarios[0] if self.usuarios else "INVITADO")
 
     def manejar_eventos(self, evento):
         if self.input_activo:
@@ -49,6 +53,10 @@ class MenuPrincipal:
         if self.listar_usuarios:
             if evento.type == pygame.KEYDOWN and evento.key in [pygame.K_RETURN, pygame.K_ESCAPE]:
                 self.listar_usuarios = False
+            return
+        if self.visualizar_logros:
+            if evento.type == pygame.KEYDOWN and evento.key in [pygame.K_RETURN, pygame.K_ESCAPE]:
+                self.visualizar_logros = False
             return
         if self.en_subadministracion:
             if evento.type == pygame.KEYDOWN:
@@ -88,6 +96,8 @@ class MenuPrincipal:
                             self._mostrar_mensaje("No hay laberintos cargados. Ve a ADMINISTRACIÓN y carga un archivo.", "warning")
                     elif opcion == "SALÓN DE LA FAMA":
                         self.administrador_eventos.publicar(EventoSeleccionMenu("SALÓN_DE_LA_FAMA"))
+                    elif opcion == "LOGROS":
+                        self.visualizar_logros = True
                     elif opcion == "SALIR":
                         self.administrador_eventos.publicar(EventoSeleccionMenu("SALIR"))
 
@@ -108,6 +118,8 @@ class MenuPrincipal:
             self._dibujar_input()
         elif self.listar_usuarios:
             self._dibujar_lista_usuarios()
+        elif self.visualizar_logros:
+            self._dibujar_logros_usuario()
         elif self.mensaje:
             self._dibujar_mensaje(self.mensaje, self.mensaje_tipo)
         elif self.en_subadministracion:
@@ -156,6 +168,25 @@ class MenuPrincipal:
         msg = fuente.render("ENTER/ESC para volver", True, (180,180,180))
         self.vista.pantalla.blit(msg, (rect.left+30, rect.bottom-50))
 
+    def _dibujar_logros_usuario(self):
+        fondo = pygame.Surface((520, 350))
+        fondo.fill((20, 40, 30))
+        rect = fondo.get_rect()
+        rect.center = (self.vista.ancho//2, self.vista.alto//2)
+        self.vista.pantalla.blit(fondo, rect)
+        fuente = pygame.font.SysFont(None, 32)
+        titulo = fuente.render(f"Logros de {self.logros_usuario.usuario}:", True, (255, 255, 200))
+        self.vista.pantalla.blit(titulo, (rect.left+30, rect.top+30))
+        y = rect.top+70
+        logros = self.logros_usuario.logros.values()
+        for logro in logros:
+            estado = "✓" if logro.desbloqueado else "✗"
+            texto = fuente.render(f"{estado} {logro.icono} {logro.nombre}: {logro.descripcion}", True, (150 if logro.desbloqueado else 255, 255, 100))
+            self.vista.pantalla.blit(texto, (rect.left+30, y))
+            y += 36
+        msg = fuente.render("ENTER/ESC para volver", True, (200,200,200))
+        self.vista.pantalla.blit(msg, (rect.left+30, rect.bottom-50))
+
     def _dibujar_mensaje(self, texto, tipo="info"):
         color = (255, 255, 255)
         if tipo == "warning":
@@ -202,6 +233,8 @@ class MenuPrincipal:
         self.usuarios.append(nombre)
         self._guardar_usuarios()
         self._mostrar_mensaje(f"Usuario '{nombre}' creado correctamente.", "info")
+        # Actualizar gestor de logros al crear usuario
+        self.logros_usuario = GestorLogros(nombre)
 
     def _eliminar_usuario(self, nombre):
         nombre = nombre.strip().upper()
@@ -211,6 +244,9 @@ class MenuPrincipal:
         self.usuarios = [u for u in self.usuarios if u != nombre]
         self._guardar_usuarios()
         self._mostrar_mensaje(f"Usuario '{nombre}' eliminado correctamente.", "info")
+        # Si borras usuario logros, actualiza a invitado
+        if self.logros_usuario.usuario == nombre:
+            self.logros_usuario = GestorLogros("INVITADO")
 
     def _verificar_laberintos_disponibles(self):
         try:
