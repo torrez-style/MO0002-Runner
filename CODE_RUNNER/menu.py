@@ -1,4 +1,5 @@
 import json
+from evento import EventoSeleccionMenu
 from salon_de_la_fama import SalonDeLaFama
 from lista_usuarios import ListaUsuarios
 
@@ -59,3 +60,23 @@ class MenuPrincipal:
     def mostrar_salones(self):
         print("\n=== SALÓN DE LA FAMA ===")
         print(self.salon.obtener_ranking_global())
+
+
+    def manejar_eventos(self, evento):
+        import pygame
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_1:
+                self.administrador_eventos.publicar(EventoSeleccionMenu("JUEGO"))
+            elif evento.key == pygame.K_2:
+                self.administrador_eventos.publicar(EventoSeleccionMenu("SALÓN_DE_LA_FAMA"))
+            elif evento.key == pygame.K_3:
+                self.administrador_eventos.publicar(EventoSeleccionMenu("ADMINISTRACION"))
+            elif evento.key == pygame.K_4:
+                self.administrador_eventos.publicar(EventoSeleccionMenu("SALIR"))
+            elif evento.key == pygame.K_ESCAPE:
+                self.administrador_eventos.publicar(EventoSeleccionMenu("SALIR"))
+
+    def dibujar(self):
+        self.vista.limpiar_pantalla((0, 0, 0))
+        self.mostrar_menu_principal()
+        self.vista.actualizar()
