@@ -1,7 +1,5 @@
 import pygame
 from evento import EventoSeleccionMenu
-import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog
 import os
 import json
 
@@ -9,7 +7,6 @@ class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
         self.vista = vista
         self.administrador_eventos = administrador_eventos
-        # Corrección de acento y nombre amigable para español
         self.opciones = ["JUEGO", "SALÓN DE LA FAMA", "ADMINISTRACIÓN", "SALIR"]
         self.opciones_subadministracion = ["Cargar laberinto", "Reiniciar salón", "Volver"]
         self.en_subadministracion = False
@@ -17,72 +14,75 @@ class MenuPrincipal:
         self.indice_principal = 0
         self.fuente_titulo= pygame.font.SysFont(None, 48)
         self.fuente_opcion= pygame.font.SysFont(None, 36)
-        self.contrasenna_administrador="admin2025"
-        
+        self.mensaje = None
+        self.mensaje_tipo = None  # 'info', 'error', 'warning'
+        self.mensaje_tiempo = 0
+        self.input_activo = False
+        self.texto_input = ""
+        self.input_callback = None
+
     def manejar_eventos(self, evento):
+        if self.input_activo:
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_RETURN:
+                    if self.input_callback is not None:
+                        self.input_callback(self.texto_input)
+                        self.input_activo = False
+                        self.texto_input = ""
+                        self.input_callback = None
+                elif evento.key == pygame.K_BACKSPACE:
+                    self.texto_input = self.texto_input[:-1]
+                elif evento.key == pygame.K_ESCAPE:
+                    self.input_activo = False
+                    self.texto_input = ""
+                    self.input_callback = None
+                else:
+                    char = evento.unicode
+                    if char.isprintable():
+                        self.texto_input += char
+            return
         if self.en_subadministracion:
-            if evento.type==pygame.KEYDOWN:
-                if evento.key== pygame.K_UP:
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_UP:
                     self.indice_submenu = (self.indice_submenu - 1) % len(self.opciones_subadministracion)
-                elif evento.key== pygame.K_DOWN:
+                elif evento.key == pygame.K_DOWN:
                     self.indice_submenu = (self.indice_submenu + 1) % len(self.opciones_subadministracion)
-                elif evento.key ==pygame.K_RETURN:
+                elif evento.key == pygame.K_RETURN:
                     opcion_seleccionada = self.opciones_subadministracion[self.indice_submenu]
-                    if opcion_seleccionada =="Cargar laberinto":
-                        self._cargar_laberinto()
-                    elif opcion_seleccionada== "Reiniciar salón":
+                    if opcion_seleccionada == "Cargar laberinto":
+                        self._iniciar_input("Ruta del archivo de laberinto (JSON)", self._cargar_laberinto)
+                    elif opcion_seleccionada == "Reiniciar salón":
                         self._reiniciar_salon_fama()
-                    elif opcion_seleccionada=="Volver":
-                        self.en_subadministracion =False
+                    elif opcion_seleccionada == "Volver":
+                        self.en_subadministracion = False
         else:
-            if evento.type==pygame.KEYDOWN:
-                if evento.key== pygame.K_UP:
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_UP:
                     self.indice_principal = (self.indice_principal - 1) % len(self.opciones)
-                elif evento.key== pygame.K_DOWN:
+                elif evento.key == pygame.K_DOWN:
                     self.indice_principal = (self.indice_principal + 1) % len(self.opciones)
-                elif evento.key== pygame.K_RETURN:
-                    opcion =self.opciones[self.indice_principal]
-                    if opcion== "ADMINISTRACIÓN":
-                        if self._autenticar_administrador():
-                            self.en_subadministracion = True
-                            self.indice_submenu = 0
+                elif evento.key == pygame.K_RETURN:
+                    opcion = self.opciones[self.indice_principal]
+                    if opcion == "ADMINISTRACIÓN":
+                        self.en_subadministracion = True
+                        self.indice_submenu = 0
                     elif opcion == "JUEGO":
                         if self._verificar_laberintos_disponibles():
                             self.administrador_eventos.publicar(EventoSeleccionMenu("JUEGO"))
                         else:
-                            self._mostrar_mensaje_sin_laberintos()
+                            self._mostrar_mensaje("No hay laberintos cargados. Ve a ADMINISTRACIÓN y carga un archivo.", "warning")
                     elif opcion == "SALÓN DE LA FAMA":
                         self.administrador_eventos.publicar(EventoSeleccionMenu("SALÓN_DE_LA_FAMA"))
                     elif opcion == "SALIR":
                         self.administrador_eventos.publicar(EventoSeleccionMenu("SALIR"))
 
-    def _autenticar_administrador(self):
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
-        try:
-            contraseña_ingresada = simpledialog.askstring("Acceso Administrativo", "Ingrese la contraseña de administrador:", show='*')
-            if contraseña_ingresada == self.contrasenna_administrador:
-                messagebox.showinfo("Acceso Concedido", "Bienvenido al panel administrativo"); return True
-            elif contraseña_ingresada is not None:
-                messagebox.showerror("Acceso Denegado", "Contraseña incorrecta")
-            return False
-        except Exception:
-            return False
-        finally:
-            ventana_raiz.destroy()
-
-    def _verificar_laberintos_disponibles(self):
-        try:
-            ruta = "niveles.json" if os.path.exists("niveles.json") else "CODE_RUNNER/niveles.json"
-            with open(ruta, "r", encoding="utf-8") as archivo:
-                datos = json.load(archivo)
-                return "niveles" in datos and isinstance(datos["niveles"], list) and len(datos["niveles"]) > 0
-        except Exception:
-            return False
-
-    def _mostrar_mensaje_sin_laberintos(self):
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
-        messagebox.showwarning("Sin Laberintos", "No hay laberintos cargados.\n\nPara jugar, debe:\n1. Ir a ADMINISTRACIÓN\n2. Usar contraseña de administrador\n3. Cargar archivos de laberinto")
-        ventana_raiz.destroy()
+    def _iniciar_input(self, mensaje, callback):
+        self.input_activo = True
+        self.texto_input = ""
+        self.input_callback = callback
+        self.mensaje = mensaje
+        self.mensaje_tipo = "info"
+        self.mensaje_tiempo = 0
 
     def dibujar(self):
         self.vista.limpiar_pantalla((0, 0, 0))
@@ -90,7 +90,11 @@ class MenuPrincipal:
         x_titulo = (self.vista.ancho - superficie_titulo.get_width()) // 2
         self.vista.pantalla.blit(superficie_titulo, (x_titulo, 100))
 
-        if self.en_subadministracion:
+        if self.input_activo:
+            self._dibujar_input()
+        elif self.mensaje:
+            self._dibujar_mensaje(self.mensaje, self.mensaje_tipo)
+        elif self.en_subadministracion:
             for indice, opcion in enumerate(self.opciones_subadministracion):
                 color = (255, 255, 0) if indice == self.indice_submenu else (200, 200, 200)
                 superficie = self.fuente_opcion.render(opcion, True, color)
@@ -105,25 +109,69 @@ class MenuPrincipal:
                 y_opcion = 200 + indice * 50
                 self.vista.pantalla.blit(superficie, (x_opcion, y_opcion))
 
-    def _cargar_laberinto(self):
-        ventana_raiz = tk.Tk(); ventana_raiz.withdraw()
-        tipos_archivo = [("JSON files", "*.json"), ("Text files", "*.txt"), ("All files", "*.*")]
-        nombre_archivo = filedialog.askopenfilename(title="Seleccionar nuevo laberinto", filetypes=tipos_archivo)
-        if nombre_archivo and os.path.exists(nombre_archivo):
-            try:
-                with open(nombre_archivo, "r", encoding="utf-8") as archivo:
-                    datos = json.load(archivo)
-                if self._validar_estructura_laberinto(datos):
-                    with open("niveles.json", "w", encoding="utf-8") as archivo_salida:
-                        json.dump(datos, archivo_salida, indent=2, ensure_ascii=False)
-                    messagebox.showinfo("Carga Exitosa", f"Se cargaron {len(datos['niveles'])} laberinto(s) correctamente.\n\nYa puede jugar desde el menú principal.")
-                else:
-                    messagebox.showerror("Error de Validación", "El archivo no tiene el formato correcto.\n\nRequisitos:\n- Debe tener clave 'niveles'\n- Cada nivel debe tener: nombre, laberinto (matriz), entrada, salida\n- La matriz debe ser rectangular con valores válidos")
-            except json.JSONDecodeError:
-                messagebox.showerror("Error de Formato", "El archivo no es un JSON válido")
-            except Exception as excepcion:
-                messagebox.showerror("Error", f"No se pudo cargar el archivo:\n{excepcion}")
-        ventana_raiz.destroy()
+    def _dibujar_input(self):
+        fondo = pygame.Surface((520, 150))
+        fondo.fill((35, 35, 35))
+        rect = fondo.get_rect()
+        rect.center = (self.vista.ancho//2, self.vista.alto//2)
+        self.vista.pantalla.blit(fondo, rect)
+        fuente = pygame.font.SysFont(None, 32)
+        pregunta = fuente.render(self.mensaje, True, (255, 255, 255))
+        self.vista.pantalla.blit(pregunta, (rect.left+30, rect.top+30))
+        entrada = fuente.render(self.texto_input, True, (200, 255, 200))
+        self.vista.pantalla.blit(entrada, (rect.left+30, rect.top+70))
+        instruccion = fuente.render("ENTER: Confirmar | ESC: Cancelar", True, (180, 180, 180))
+        self.vista.pantalla.blit(instruccion, (rect.left+30, rect.top+110))
+
+    def _dibujar_mensaje(self, texto, tipo="info"):
+        color = (255, 255, 255)
+        if tipo == "warning":
+            color = (255, 255, 0)
+        elif tipo == "error":
+            color = (255, 64, 64)
+        fuente = pygame.font.SysFont(None, 32)
+        mensaje = fuente.render(texto, True, color)
+        rect = mensaje.get_rect()
+        rect.center = (self.vista.ancho//2, 550)
+        self.vista.pantalla.blit(mensaje, rect)
+        self.mensaje_tiempo += 1
+        if self.mensaje_tiempo > 180:
+            self.mensaje = None
+            self.mensaje_tiempo = 0
+            self.mensaje_tipo = None
+
+    def _mostrar_mensaje(self, texto, tipo="info"):
+        self.mensaje = texto
+        self.mensaje_tipo = tipo
+        self.mensaje_tiempo = 0
+
+    def _verificar_laberintos_disponibles(self):
+        try:
+            ruta = "niveles.json" if os.path.exists("niveles.json") else "CODE_RUNNER/niveles.json"
+            with open(ruta, "r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+                return "niveles" in datos and isinstance(datos["niveles"], list) and len(datos["niveles"]) > 0
+        except Exception:
+            return False
+
+    def _cargar_laberinto(self, ruta_json):
+        if not ruta_json or not os.path.exists(ruta_json):
+            self._mostrar_mensaje("No se encontró el archivo especificado.", "error")
+            return
+        try:
+            with open(ruta_json, "r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+            if self._validar_estructura_laberinto(datos):
+                with open("niveles.json", "w", encoding="utf-8") as archivo_salida:
+                    json.dump(datos, archivo_salida, indent=2, ensure_ascii=False)
+                self._mostrar_mensaje(f"Se cargaron {len(datos['niveles'])} laberinto(s) correctamente.", "info")
+            else:
+                self._mostrar_mensaje("Formato incorrecto. Requiere clave 'niveles', matriz rectangular y valores válidos.", "error")
+        except json.JSONDecodeError:
+            self._mostrar_mensaje("El archivo seleccionado no es JSON válido.", "error")
+        except Exception as excepcion:
+            self._mostrar_mensaje(f"Error: {excepcion}", "error")
+
     def _validar_estructura_laberinto(self, datos):
         try:
             if not isinstance(datos, dict) or "niveles" not in datos:
@@ -147,7 +195,8 @@ class MenuPrincipal:
                     for celda in fila:
                         if not isinstance(celda, int) or celda not in [0,1,2,3]:
                             return False
-                entrada = nivel["entrada"]; salida = nivel["salida"]
+                entrada = nivel["entrada"]
+                salida = nivel["salida"]
                 if (not isinstance(entrada, list) or len(entrada) != 2 or not isinstance(salida, list) or len(salida) != 2):
                     return False
             return True
@@ -158,6 +207,6 @@ class MenuPrincipal:
         try:
             with open("puntuaciones.json", "w", encoding="utf-8") as archivo:
                 json.dump([], archivo)
-            messagebox.showinfo("Reinicio Exitoso", "El salón de la fama ha sido vaciado correctamente.")
+            self._mostrar_mensaje("El salón de la fama ha sido vaciado correctamente.", "info")
         except Exception as excepcion:
-            messagebox.showerror("Error", f"No se pudo vaciar el salón de la fama:\n{excepcion}")
+            self._mostrar_mensaje(f"Error al vaciar el salón de la fama: {excepcion}", "error")
