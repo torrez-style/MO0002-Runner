@@ -288,4 +288,116 @@ class MenuPrincipal:
         self.usuario_a_eliminar = nombre
         self.pide_contraseña = True
         self._iniciar_input(
-            f"Ingrese
+            f"Ingrese contraseña para eliminar '{nombre}'",
+            self._verificar_password_y_eliminar
+        )
+
+    def _verificar_password_y_eliminar(self, password):
+        if self.usuario_a_eliminar is None:
+            self._mostrar_mensaje("Error: No hay usuario seleccionado.", "error")
+            self.eliminar_en_progreso = False
+            self.pide_contraseña = False
+            return
+        if password.strip() != self.PASSWORD_ADMIN:
+            self._mostrar_mensaje("Contraseña incorrecta. Eliminación cancelada.", "error")
+            self.eliminar_en_progreso = False
+            self.pide_contraseña = False
+            self.usuario_a_eliminar = None
+            return
+        # Contraseña correcta, eliminar usuario
+        nombre = self.usuario_a_eliminar
+        self.usuarios = [u for u in self.usuarios if u != nombre]
+        self._guardar_usuarios()
+        self._mostrar_mensaje(f"Usuario '{nombre}' eliminado correctamente.", "info")
+        self.eliminar_en_progreso = False
+        self.pide_contraseña = False
+        self.usuario_a_eliminar = None
+
+    def _verificar_laberintos_disponibles(self):
+        try:
+            ruta = (
+                "niveles.json"
+                if os.path.exists("niveles.json")
+                else "CODE_RUNNER/niveles.json"
+            )
+            with open(ruta, "r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+            return (
+                "niveles" in datos
+                and isinstance(datos["niveles"], list)
+                and len(datos["niveles"]) > 0
+            )
+        except Exception:
+            return False
+
+    def _cargar_laberinto(self, ruta_json):
+        if not ruta_json or not os.path.exists(ruta_json):
+            self._mostrar_mensaje("No se encontró el archivo especificado.", "error")
+            return
+        try:
+            with open(ruta_json, "r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+            if self._validar_estructura_laberinto(datos):
+                with open("niveles.json", "w", encoding="utf-8") as archivo_salida:
+                    json.dump(datos, archivo_salida, indent=2, ensure_ascii=False)
+                self._mostrar_mensaje(
+                    f"Se cargaron {len(datos['niveles'])} laberinto(s) correctamente.",
+                    "info",
+                )
+            else:
+                self._mostrar_mensaje(
+                    "Formato incorrecto. Requiere clave 'niveles', matriz rectangular y valores válidos.",
+                    "error",
+                )
+        except json.JSONDecodeError:
+            self._mostrar_mensaje("El archivo seleccionado no es JSON válido.", "error")
+        except Exception as excepcion:
+            self._mostrar_mensaje(f"Error: {excepcion}", "error")
+
+    def _validar_estructura_laberinto(self, datos):
+        try:
+            if not isinstance(datos, dict) or "niveles" not in datos:
+                return False
+            niveles = datos["niveles"]
+            if not isinstance(niveles, list) or len(niveles) == 0:
+                return False
+            for nivel in niveles:
+                if not isinstance(nivel, dict):
+                    return False
+                for campo in ["nombre", "laberinto", "entrada", "salida"]:
+                    if campo not in nivel:
+                        return False
+                laberinto = nivel["laberinto"]
+                if not isinstance(laberinto, list) or len(laberinto) == 0:
+                    return False
+                ancho = len(laberinto[0])
+                for fila in laberinto:
+                    if not isinstance(fila, list) or len(fila) != ancho:
+                        return False
+                    for celda in fila:
+                        if not isinstance(celda, int) or celda not in [0, 1, 2, 3]:
+                            return False
+                entrada = nivel["entrada"]
+                salida = nivel["salida"]
+                if (
+                    not isinstance(entrada, list)
+                    or len(entrada) != 2
+                    or not isinstance(salida, list)
+                    or len(salida) != 2
+                ):
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def _reiniciar_salon_fama(self):
+        try:
+            with open("puntuaciones.json", "w", encoding="utf-8") as archivo:
+                json.dump({}, archivo)
+            self._mostrar_mensaje(
+                "El salón de la fama ha sido vaciado correctamente.", "info"
+            )
+        except Exception as excepcion:
+            self._mostrar_mensaje(
+                f"Error al vaciar el salón de la fama: {excepcion}", "error"
+            )
