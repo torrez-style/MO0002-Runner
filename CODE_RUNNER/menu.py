@@ -8,18 +8,23 @@ class MenuPrincipal:
         self.vista = vista
         self.administrador_eventos = administrador_eventos
         self.opciones = ["JUEGO", "SALÓN DE LA FAMA", "ADMINISTRACIÓN", "SALIR"]
-        self.opciones_subadministracion = ["Cargar laberinto", "Reiniciar salón", "Volver"]
+        self.opciones_subadministracion = [
+            "Crear usuario", "Eliminar usuario", "Listar usuarios",
+            "Cargar laberinto", "Reiniciar salón", "Volver"
+        ]
         self.en_subadministracion = False
         self.indice_submenu = 0
         self.indice_principal = 0
         self.fuente_titulo= pygame.font.SysFont(None, 48)
         self.fuente_opcion= pygame.font.SysFont(None, 36)
         self.mensaje = None
-        self.mensaje_tipo = None  # 'info', 'error', 'warning'
+        self.mensaje_tipo = None
         self.mensaje_tiempo = 0
         self.input_activo = False
         self.texto_input = ""
         self.input_callback = None
+        self.listar_usuarios = False
+        self.usuarios = self._leer_usuarios()
 
     def manejar_eventos(self, evento):
         if self.input_activo:
@@ -41,6 +46,10 @@ class MenuPrincipal:
                     if char.isprintable():
                         self.texto_input += char
             return
+        if self.listar_usuarios:
+            if evento.type == pygame.KEYDOWN and evento.key in [pygame.K_RETURN, pygame.K_ESCAPE]:
+                self.listar_usuarios = False
+            return
         if self.en_subadministracion:
             if evento.type == pygame.KEYDOWN:
                 if evento.key == pygame.K_UP:
@@ -49,7 +58,13 @@ class MenuPrincipal:
                     self.indice_submenu = (self.indice_submenu + 1) % len(self.opciones_subadministracion)
                 elif evento.key == pygame.K_RETURN:
                     opcion_seleccionada = self.opciones_subadministracion[self.indice_submenu]
-                    if opcion_seleccionada == "Cargar laberinto":
+                    if opcion_seleccionada == "Crear usuario":
+                        self._iniciar_input("Nombre del usuario a crear", self._crear_usuario)
+                    elif opcion_seleccionada == "Eliminar usuario":
+                        self._iniciar_input("Nombre del usuario a eliminar", self._eliminar_usuario)
+                    elif opcion_seleccionada == "Listar usuarios":
+                        self.listar_usuarios = True
+                    elif opcion_seleccionada == "Cargar laberinto":
                         self._iniciar_input("Ruta del archivo de laberinto (JSON)", self._cargar_laberinto)
                     elif opcion_seleccionada == "Reiniciar salón":
                         self._reiniciar_salon_fama()
@@ -89,9 +104,10 @@ class MenuPrincipal:
         superficie_titulo = self.fuente_titulo.render("Maze-Run", True, (255, 255, 255))
         x_titulo = (self.vista.ancho - superficie_titulo.get_width()) // 2
         self.vista.pantalla.blit(superficie_titulo, (x_titulo, 100))
-
         if self.input_activo:
             self._dibujar_input()
+        elif self.listar_usuarios:
+            self._dibujar_lista_usuarios()
         elif self.mensaje:
             self._dibujar_mensaje(self.mensaje, self.mensaje_tipo)
         elif self.en_subadministracion:
@@ -123,6 +139,23 @@ class MenuPrincipal:
         instruccion = fuente.render("ENTER: Confirmar | ESC: Cancelar", True, (180, 180, 180))
         self.vista.pantalla.blit(instruccion, (rect.left+30, rect.top+110))
 
+    def _dibujar_lista_usuarios(self):
+        fondo = pygame.Surface((520, 350))
+        fondo.fill((42, 42, 52))
+        rect = fondo.get_rect()
+        rect.center = (self.vista.ancho//2, self.vista.alto//2)
+        self.vista.pantalla.blit(fondo, rect)
+        fuente = pygame.font.SysFont(None, 32)
+        titulo = fuente.render("Usuarios existentes:", True, (255, 255, 255))
+        self.vista.pantalla.blit(titulo, (rect.left+30, rect.top+30))
+        y = rect.top+70
+        for usuario in self.usuarios:
+            texto = fuente.render(usuario, True, (200, 255, 255))
+            self.vista.pantalla.blit(texto, (rect.left+30, y))
+            y += 30
+        msg = fuente.render("ENTER/ESC para volver", True, (180,180,180))
+        self.vista.pantalla.blit(msg, (rect.left+30, rect.bottom-50))
+
     def _dibujar_mensaje(self, texto, tipo="info"):
         color = (255, 255, 255)
         if tipo == "warning":
@@ -144,6 +177,40 @@ class MenuPrincipal:
         self.mensaje = texto
         self.mensaje_tipo = tipo
         self.mensaje_tiempo = 0
+
+    def _leer_usuarios(self):
+        try:
+            with open("CODE_RUNNER/perfiles.json", "r", encoding="utf-8") as archivo:
+                lista = json.load(archivo)
+            lista = [x.upper() for x in lista if isinstance(x, str)]
+            return sorted(set(lista))
+        except Exception:
+            return []
+
+    def _guardar_usuarios(self):
+        with open("CODE_RUNNER/perfiles.json", "w", encoding="utf-8") as archivo:
+            json.dump(sorted(set(self.usuarios)), archivo, indent=2, ensure_ascii=False)
+
+    def _crear_usuario(self, nombre):
+        nombre = nombre.strip().upper()
+        if not nombre:
+            self._mostrar_mensaje("Nombre de usuario vacío o inválido.", "error")
+            return
+        if nombre in self.usuarios:
+            self._mostrar_mensaje(f"El usuario '{nombre}' ya existe.", "error")
+            return
+        self.usuarios.append(nombre)
+        self._guardar_usuarios()
+        self._mostrar_mensaje(f"Usuario '{nombre}' creado correctamente.", "info")
+
+    def _eliminar_usuario(self, nombre):
+        nombre = nombre.strip().upper()
+        if nombre not in self.usuarios:
+            self._mostrar_mensaje(f"El usuario '{nombre}' no existe.", "error")
+            return
+        self.usuarios = [u for u in self.usuarios if u != nombre]
+        self._guardar_usuarios()
+        self._mostrar_mensaje(f"Usuario '{nombre}' eliminado correctamente.", "info")
 
     def _verificar_laberintos_disponibles(self):
         try:
