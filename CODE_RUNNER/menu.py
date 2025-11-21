@@ -4,8 +4,12 @@ from lista_usuarios import ListaUsuarios
 
 
 class MenuPrincipal:
-    def __init__(self):
+    def __init__(self, vista, administrador_eventos):        self.salon = SalonDeLaFama()
+                self.vista = vista
+        self.administrador_eventos = administrador_eventos
         self.salon = SalonDeLaFama()
+        self.lista_usuarios = ListaUsuarios()
+        self.contrasena_admin = "admin123"
         self.lista_usuarios = ListaUsuarios()
         self.listar_usuarios = False
         self.mostrar_salon = False
