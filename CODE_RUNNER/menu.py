@@ -34,6 +34,9 @@ class MenuPrincipal:
         self.salon = SalonDeLaFama()
         self.mostrar_salon = False
         self.usuario_actual = None
+        # Variables para el proceso de eliminación con contraseña
+        self.usuario_a_eliminar = None
+        self.PASSWORD_ADMIN = "admin2025"
 
     def manejar_eventos(self, evento):
         if self.input_activo:
@@ -50,6 +53,7 @@ class MenuPrincipal:
                     self.input_activo = False
                     self.texto_input = ""
                     self.input_callback = None
+                    self.usuario_a_eliminar = None  # Cancelar proceso de eliminación
                 else:
                     char = evento.unicode
                     if char.isprintable():
@@ -92,7 +96,7 @@ class MenuPrincipal:
                         )
                     elif opcion_seleccionada == "Eliminar usuario":
                         self._iniciar_input(
-                            "Nombre del usuario a eliminar", self._eliminar_usuario
+                            "Nombre del usuario a eliminar", self._iniciar_eliminacion_usuario
                         )
                     elif opcion_seleccionada == "Listar usuarios":
                         self.listar_usuarios = True
@@ -191,7 +195,12 @@ class MenuPrincipal:
         pregunta = fuente.render(self.mensaje, True, (255, 255, 255))
         self.vista.pantalla.blit(pregunta, (rect.left + 30, rect.top + 30))
 
-        entrada = fuente.render(self.texto_input, True, (200, 255, 200))
+        # Ocultar la contraseña con asteriscos si estamos en el paso de verificación
+        texto_a_mostrar = self.texto_input
+        if self.usuario_a_eliminar is not None and "contraseña" in self.mensaje.lower():
+            texto_a_mostrar = "*" * len(self.texto_input)
+        
+        entrada = fuente.render(texto_a_mostrar, True, (200, 255, 200))
         self.vista.pantalla.blit(entrada, (rect.left + 30, rect.top + 70))
 
         instruccion = fuente.render(
@@ -298,14 +307,38 @@ class MenuPrincipal:
         self._guardar_usuarios()
         self._mostrar_mensaje(f"Usuario '{nombre}' creado correctamente.", "info")
 
-    def _eliminar_usuario(self, nombre):
+    def _iniciar_eliminacion_usuario(self, nombre):
+        """Primer paso: verifica que el usuario existe y solicita contraseña"""
         nombre = nombre.strip().upper()
         if nombre not in self.usuarios:
             self._mostrar_mensaje(f"El usuario '{nombre}' no existe.", "error")
+            self.usuario_a_eliminar = None
             return
+        
+        # Guardar el nombre del usuario a eliminar y pedir contraseña
+        self.usuario_a_eliminar = nombre
+        self._iniciar_input(
+            f"Ingrese contraseña para eliminar '{nombre}'",
+            self._verificar_password_y_eliminar
+        )
+
+    def _verificar_password_y_eliminar(self, password):
+        """Segundo paso: verifica la contraseña y elimina el usuario"""
+        if self.usuario_a_eliminar is None:
+            self._mostrar_mensaje("Error: No hay usuario seleccionado.", "error")
+            return
+        
+        if password.strip() != self.PASSWORD_ADMIN:
+            self._mostrar_mensaje("Contraseña incorrecta. Eliminación cancelada.", "error")
+            self.usuario_a_eliminar = None
+            return
+        
+        # Contraseña correcta, proceder con la eliminación
+        nombre = self.usuario_a_eliminar
         self.usuarios = [u for u in self.usuarios if u != nombre]
         self._guardar_usuarios()
         self._mostrar_mensaje(f"Usuario '{nombre}' eliminado correctamente.", "info")
+        self.usuario_a_eliminar = None
 
     def _verificar_laberintos_disponibles(self):
         try:
