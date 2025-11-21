@@ -2,6 +2,7 @@ import pygame
 from evento import EventoSeleccionMenu
 import os
 import json
+from salon_de_la_fama import SalonDeLaFama
 
 class MenuPrincipal:
     def __init__(self, vista, administrador_eventos):
@@ -25,6 +26,9 @@ class MenuPrincipal:
         self.input_callback = None
         self.listar_usuarios = False
         self.usuarios = self._leer_usuarios()
+                self.salon = SalonDeLaFama()
+        self.mostrar_salon = False
+        self.usuario_actual = None
 
     def manejar_eventos(self, evento):
         if self.input_activo:
