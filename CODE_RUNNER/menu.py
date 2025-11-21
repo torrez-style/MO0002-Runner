@@ -3,7 +3,7 @@ from salon_de_la_fama import SalonDeLaFama
 from lista_usuarios import ListaUsuarios
 
 
-class Menu:
+class MenuPrincipal:
     def __init__(self):
         self.salon = SalonDeLaFama()
         self.lista_usuarios = ListaUsuarios()
