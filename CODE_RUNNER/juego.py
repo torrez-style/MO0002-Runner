@@ -453,7 +453,8 @@ class ControladorJugador:
         ):
             j.posicion_x, j.posicion_y = nueva_x, nueva_y
             j.administrador_eventos.publicar(
-                EventoColisionEnemigo((j.posicion_x, j.posicion_y), (j.posicion_x, j.posicion_y))           
+                EventoColisionEnemigo((j.posicion_x, j.posicion_y), (j.posicion_x, j.posicion_y))
+                                )
 
 
 class ControladorEnemigos:
@@ -482,6 +483,7 @@ class ControladorEnemigos:
                 j.enemigos[i] = siguiente
             j.administrador_eventos.publicar(
             EventoColisionEnemigo((j.posicion_x, j.posicion_y), tuple(j.enemigos[i]))         
+                                )
 
 
 class ManejadorPotenciadores:
