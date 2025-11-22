@@ -2,7 +2,6 @@ import json
 import os
 from datetime import datetime
 
-
 class SalonDeLaFama:
     def __init__(self, archivo="puntuaciones.json"):
         self.archivo = archivo
@@ -21,17 +20,19 @@ class SalonDeLaFama:
         with open(self.archivo, "w") as f:
             json.dump(self.puntuaciones, f, indent=4)
 
-    def registrar_puntuacion(self, usuario, puntuacion, tiempo):
+    # ACEPTA NIVEL Y NOMBRE_LABERINTO
+    def registrar_puntuacion(self, usuario, puntuacion, nivel, nombre_laberinto, tiempo=None):
         if usuario not in self.puntuaciones:
             self.puntuaciones[usuario] = []
-
-        self.puntuaciones[usuario].append(
-            {
-                "puntuacion": puntuacion,
-                "tiempo": tiempo,
-                "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
-        )
+        data = {
+            "puntuacion": puntuacion,
+            "nivel": nivel,
+            "laberinto": nombre_laberinto,
+            "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        if tiempo is not None:
+            data["tiempo"] = tiempo
+        self.puntuaciones[usuario].append(data)
         self._guardar_puntuaciones()
 
     def obtener_ranking_global(self):
