@@ -239,10 +239,7 @@ class Juego:
                     pygame.quit()
                     exit()
                 if self.estado == "MENU":
-                    self.vista.limpiar_pantalla((0, 0, 0))
                     self.menu.manejar_eventos(evento)
-                    self.menu.dibujar()
-                    self.vista.actualizar()
                 elif self.estado == "JUEGO":
                     if evento.type == pygame.KEYDOWN:
                         if evento.key == pygame.K_ESCAPE:
@@ -269,7 +266,6 @@ class Juego:
                         elif evento.key == pygame.K_RIGHT:
                             self.direcciones_presionadas.discard("derecha")
                 elif self.estado == "GAME_OVER":
-                    self.vista.limpiar_pantalla((30, 0, 0))
                     if evento.type == pygame.KEYDOWN:
                         if evento.key == pygame.K_ESCAPE:
                             self.estado = "MENU"
@@ -280,46 +276,9 @@ class Juego:
                             self.nivel_actual = 0
                             self._reiniciar_juego()
                             self.estado = "JUEGO"
-                    self.vista.dibujar_texto("GAME OVER", 220, 200, 72, (255, 80, 80))
-                    self.vista.dibujar_texto(
-                        f"Puntaje final: {self.puntuacion_final}",
-                        200,
-                        280,
-                        36,
-                        (255, 255, 255),
-                    )
-                    self.vista.dibujar_texto(
-                        "ENTER: Reintentar ESC: Menú", 160, 340, 28, (220, 220, 220)
-                    )
-                    self.vista.actualizar()
                 elif self.estado == "SALÓN_DE_LA_FAMA":
-                    self.vista.limpiar_pantalla((0, 0, 50))
-                    self.vista.dibujar_texto(
-                        "Salón de la Fama", 150, 200, 48, (255, 255, 0)
-                    )
-                    puntuaciones = self._cargar_json("puntuaciones.json", {})
-                    y_posicion = 270
-                    if isinstance(puntuaciones, dict):
-                        for usuario, scores in list(puntuaciones.items())[:10]:
-                            if scores and isinstance(scores, list):
-                                mejor_score = max(
-                                    [
-                                        s.get("puntuacion", 0)
-                                        for s in scores
-                                        if isinstance(s, dict)
-                                    ],
-                                    default=0,
-                                )
-                                self.vista.dibujar_texto(
-                                    f"{usuario}: {mejor_score}",
-                                    120,
-                                    y_posicion,
-                                    24,
-                                    (255, 255, 255),
-                                )
-                                y_posicion += 30
-                    self.vista.dibujar_texto("ESC: Volver", 120, 550, 32, (200, 200, 200))
-                    self.vista.actualizar()
+                    if evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
+                        self.estado = "MENU"
             # SOLO actualizar y dibujar si el estado es JUEGO
             if self.estado == "JUEGO":
                 if self.direcciones_presionadas:
@@ -409,6 +368,52 @@ class Juego:
                 if self.mensaje_texto and self.cuadros_mensaje > 0:
                     self.vista.dibujar_texto(self.mensaje_texto, 120, 60, 32, (255, 64, 64))
                 self.vista.actualizar()
+            elif self.estado == "MENU":
+                self.vista.limpiar_pantalla((0, 0, 0))
+                self.menu.dibujar()
+                self.vista.actualizar()
+            elif self.estado == "GAME_OVER":
+                self.vista.limpiar_pantalla((30, 0, 0))
+                self.vista.dibujar_texto("GAME OVER", 220, 200, 72, (255, 80, 80))
+                self.vista.dibujar_texto(
+                    f"Puntaje final: {self.puntuacion_final}",
+                    200,
+                    280,
+                    36,
+                    (255, 255, 255),
+                )
+                self.vista.dibujar_texto(
+                    "ENTER: Reintentar ESC: Menú", 160, 340, 28, (220, 220, 220)
+                )
+                self.vista.actualizar()
+            elif self.estado == "SALÓN_DE_LA_FAMA":
+                self.vista.limpiar_pantalla((0, 0, 50))
+                self.vista.dibujar_texto(
+                    "Salón de la Fama", 150, 200, 48, (255, 255, 0)
+                )
+                puntuaciones = self._cargar_json("puntuaciones.json", {})
+                y_posicion = 270
+                if isinstance(puntuaciones, dict):
+                    for usuario, scores in list(puntuaciones.items())[:10]:
+                        if scores and isinstance(scores, list):
+                            mejor_score = max(
+                                [
+                                    s.get("puntuacion", 0)
+                                    for s in scores
+                                    if isinstance(s, dict)
+                                ],
+                                default=0,
+                            )
+                            self.vista.dibujar_texto(
+                                f"{usuario}: {mejor_score}",
+                                120,
+                                y_posicion,
+                                24,
+                                (255, 255, 255),
+                            )
+                            y_posicion += 30
+                self.vista.dibujar_texto("ESC: Volver", 120, 550, 32, (200, 200, 200))
+                self.vista.actualizar()
             self.reloj.tick(self.FPS)
 
     def _cargar_json(self, ruta, por_defecto=None):
@@ -425,4 +430,138 @@ class Juego:
         except json.JSONDecodeError:
             return por_defecto if por_defecto is not None else {}
 
-# ...INCLUYE AQUÍ el resto de los controladores y manejadores según la versión previa...
+
+class ControladorJugador:
+    def __init__(self, juego, administrador):
+        self.juego = juego
+        administrador.registrar(EventoMoverJugador, self)
+
+    def notificar(self, evento):
+        j = self.juego
+        nueva_x, nueva_y = j.posicion_x, j.posicion_y
+        if evento.direccion == "arriba":
+            nueva_y -= 1
+        elif evento.direccion == "abajo":
+            nueva_y += 1
+        elif evento.direccion == "izquierda":
+            nueva_x -= 1
+        elif evento.direccion == "derecha":
+            nueva_x += 1
+        if (
+            0 <= nueva_x < len(j.LABERINTO[0])
+            and 0 <= nueva_y < len(j.LABERINTO)
+            and j.LABERINTO[nueva_y][nueva_x] == 0
+        ):
+            j.posicion_x, j.posicion_y = nueva_x, nueva_y
+            # Verificar colisión inmediata después del movimiento
+            for enemigo in j.enemigos:
+                if (nueva_x, nueva_y) == tuple(enemigo):
+                    j.administrador_eventos.publicar(
+                        EventoColisionEnemigo((j.posicion_x, j.posicion_y), tuple(enemigo))
+                    )
+                    break
+
+
+class ControladorEnemigos:
+    def __init__(self, juego, administrador):
+        self.juego = juego
+        self.administrador = administrador
+        administrador.registrar(EventoMoverJugador, self)
+
+    def notificar(self, evento):
+        pass
+
+    def actualizar(self):
+        j = self.juego
+        if j.potenciador_activo == "congelar":
+            return
+        j.contador_cuadros += 1
+        if j.contador_cuadros < j.VELOCIDAD_ENEMIGOS:
+            return
+        j.contador_cuadros = 0
+        for i in range(len(j.enemigos)):
+            enemigo_x, enemigo_y = j.enemigos[i]
+            siguiente = bfs_siguiente_paso(
+                j.LABERINTO, (enemigo_x, enemigo_y), (j.posicion_x, j.posicion_y)
+            )
+            if siguiente:
+                j.enemigos[i] = siguiente
+                # Verificar colisión después de que el enemigo se mueva
+                if tuple(siguiente) == (j.posicion_x, j.posicion_y):
+                    j.administrador_eventos.publicar(
+                        EventoColisionEnemigo((j.posicion_x, j.posicion_y), tuple(siguiente))
+                    )
+
+
+class ManejadorPotenciadores:
+    def __init__(self, juego, administrador):
+        self.juego = juego
+        administrador.registrar(EventoPowerUpAgarrado, self)
+
+    def notificar(self, evento):
+        j = self.juego
+        j.potenciador_activo = evento.tipo
+        j.temporizador_potenciador = j.DURACION_POTENCIADOR
+
+
+class ManejadorColisiones:
+    def __init__(self, juego, administrador):
+        self.juego = juego
+        administrador.registrar(EventoColisionEnemigo, self)
+
+    def notificar(self, evento):
+        j = self.juego
+        if j.potenciador_activo == "invulnerable":
+            return
+        # Solo procesar si realmente hay colisión
+        if evento.posicion_jugador == evento.posicion_enemigo:
+            j.vidas -= 1
+            if j.vidas > 0:
+                j.posicion_x, j.posicion_y = j._obtener_celda_libre_jugador()
+                j._recolocar_enemigos_si_vacio(j.niveles[j.nivel_actual])
+            else:
+                j._cambiar_a_fin_de_juego()
+
+
+class ManejadorEstrellas:
+    def __init__(self, juego, administrador):
+        self.juego = juego
+        administrador.registrar(EventoRecogerEstrella, self)
+
+    def notificar(self, evento):
+        j = self.juego
+        if evento.posicion in j.estrellas:
+            j.estrellas.remove(evento.posicion)
+            j.puntuacion += 10
+            if not j.estrellas:
+                j._avanzar_nivel()
+
+
+class ManejadorMenu:
+    def __init__(self, juego, administrador):
+        self.juego = juego
+        administrador.registrar(EventoSeleccionMenu, self)
+
+    def notificar(self, evento):
+        j = self.juego
+        if evento.opcion == "JUEGO":
+            if not j.sin_niveles_cargados:
+                # Obtener el usuario actual desde el menú
+                if j.menu.usuarios:
+                    j.usuario_actual = j.menu.usuarios[
+                        0
+                    ].upper()  # Usar el primer usuario
+                j.nivel_actual = 0
+                j._reiniciar_juego()
+                j.estado = "JUEGO"
+            else:
+                j.mensaje_texto = "Debe cargar laberintos desde Administración primero"
+                j.cuadros_mensaje = 120
+        elif evento.opcion == "SALIR":
+            pygame.quit()
+            exit()
+        elif evento.opcion == "ADMINISTRACION":
+            j._recargar_niveles()
+            j.estado = "MENU"
+        else:
+            j.estado = evento.opcion
