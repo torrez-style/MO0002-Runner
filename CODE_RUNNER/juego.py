@@ -64,9 +64,174 @@ class Juego:
         self._configurar_tablero()
         self._reiniciar_juego()
 
-    # ... (todo igual: clases, métodos, etc) ...
-    # SOLO cambiar el bloque principal del método ejecutar()
-    # EN VEZ de dibujar SIEMPRE el juego, hacer sólo si estado=='JUEGO':
+    def _crear_nivel_emergencia(self):
+        return {
+            "nombre": "Emergencia",
+            "laberinto": [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 0, 1, 1, 1, 1, 1, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+            "vel_enemigos": 14,
+            "estrellas": 3,
+            "enemigos": 1,
+            "powerups": 0,
+            "entrada": [1, 1],
+            "salida": [1, 1],
+            "colores": {
+                "pared": [100, 100, 100],
+                "suelo": [200, 200, 200],
+                "enemigo": [220, 50, 50],
+            },
+        }
+
+    def _cargar_niveles(self):
+        try:
+            ruta_completa = os.path.join("CODE_RUNNER", self.ruta_niveles)
+            if not os.path.exists(ruta_completa):
+                ruta_completa = self.ruta_niveles
+            with open(ruta_completa, "r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+            return (
+                datos["niveles"]
+                if "niveles" in datos and isinstance(datos["niveles"], list)
+                else []
+            )
+        except Exception as excepcion:
+            print(f"Error cargando niveles: {excepcion}")
+            return []
+
+    def _recargar_niveles(self):
+        nuevos_niveles = self._cargar_niveles()
+        if nuevos_niveles:
+            self.niveles = nuevos_niveles
+            self.sin_niveles_cargados = False
+            self.nivel_actual = 0
+            self.LABERINTO = [
+                [0 if c in (2, 3) else c for c in fila]
+                for fila in self.niveles[0]["laberinto"]
+            ]
+            self._configurar_tablero()
+            self._reiniciar_juego()
+            self.vista.titulo = "Maze-Run - Nivel 1 (nuevos niveles cargados)"
+            self.mensaje_texto = f"¡{len(nuevos_niveles)} laberinto(s) cargado(s)!"
+            self.cuadros_mensaje = 180
+        else:
+            self.mensaje_texto = "No se encontraron laberintos válidos"
+            self.cuadros_mensaje = 120
+
+    def _configurar_tablero(self):
+        filas, columnas = len(self.LABERINTO), len(self.LABERINTO[0])
+        ancho_tablero = self.tamaño_celda * columnas
+        alto_tablero = self.tamaño_celda * filas
+        self.vista.desplazamiento_x = (self.vista.ancho - ancho_tablero) // 2
+        self.vista.desplazamiento_y = (self.vista.alto - alto_tablero) // 2 + 20
+
+    def _generar_posiciones_validas(self, laberinto, cantidad, exclusiones):
+        posiciones = []
+        filas, columnas = len(laberinto), len(laberinto[0])
+        intentos = 0
+        while len(posiciones) < cantidad and intentos < 1000:
+            x, y = random.randint(0, columnas - 1), random.randint(0, filas - 1)
+            if (
+                laberinto[y][x] == 0
+                and [x, y] not in exclusiones
+                and [x, y] not in posiciones
+            ):
+                posiciones.append([x, y])
+            intentos += 1
+        return posiciones
+
+    def _obtener_celda_libre_jugador(self):
+        entrada = self.niveles[self.nivel_actual].get("entrada", [1, 1])
+        return (
+            tuple(entrada)
+            if isinstance(entrada, list) and len(entrada) == 2
+            else (1, 1)
+        )
+
+    def _recolocar_enemigos_si_vacio(self, nivel_actual):
+        if not self.enemigos:
+            self.enemigos = self._generar_posiciones_validas(
+                self.LABERINTO,
+                max(1, nivel_actual.get("enemigos", 1)),
+                [[self.posicion_x, self.posicion_y]] + self.estrellas,
+            )
+
+    def _cambiar_a_fin_de_juego(self):
+        self.puntuacion_final = self.puntuacion
+        self.estado = "GAME_OVER"
+
+        # Registrar puntuación en el Salón de la Fama
+        if self.usuario_actual:
+            nombre_nivel = self.niveles[self.nivel_actual].get(
+                "nombre", f"Nivel {self.nivel_actual + 1}"
+            )
+            self.salon.registrar_puntuacion(
+                usuario=self.usuario_actual,
+                puntuacion=self.puntuacion_final,
+                nivel=self.nivel_actual + 1,
+                nombre_laberinto=nombre_nivel,
+            )
+
+    def _reiniciar_juego(self):
+        if self.nivel_actual >= len(self.niveles):
+            self.nivel_actual = 0
+        nivel_actual = self.niveles[self.nivel_actual]
+        self.LABERINTO = [
+            [0 if c in (2, 3) else c for c in fila]
+            for fila in nivel_actual["laberinto"]
+        ]
+        self.posicion_x, self.posicion_y = self._obtener_celda_libre_jugador()
+        exclusiones = [self.posicion_x, self.posicion_y]
+        objetivo_estrellas = 3
+        self.estrellas = self._generar_posiciones_validas(
+            self.LABERINTO, objetivo_estrellas, exclusiones
+        )
+        self.enemigos = self._generar_posiciones_validas(
+            self.LABERINTO,
+            max(1, nivel_actual.get("enemigos", 1)),
+            exclusiones + self.estrellas,
+        )
+        self.potenciadores = self._generar_posiciones_validas(
+            self.LABERINTO,
+            nivel_actual.get("powerups", 1),
+            exclusiones + self.estrellas + self.enemigos,
+        )
+        self._recolocar_enemigos_si_vacio(nivel_actual)
+        self.desplazamiento_interfaz_x = 20
+        self.desplazamiento_interfaz_y = 48
+        self.vidas = 3
+        self.contador_cuadros = 0
+        self.potenciador_activo = None
+        self.temporizador_potenciador = 0
+        self.mensaje_texto = ""
+        self.cuadros_mensaje = 0
+
+    def _avanzar_nivel(self):
+        if len(self.estrellas) > 0:
+            self.mensaje_texto = f"Faltan {len(self.estrellas)} estrella(s)"
+            self.cuadros_mensaje = 60
+            return
+        if self.nivel_actual < len(self.niveles) - 1:
+            self.nivel_actual += 1
+            self._reiniciar_juego()
+            self.vista.titulo = f"Maze-Run - Nivel {self.nivel_actual + 1}"
+        else:
+            self._cambiar_a_fin_de_juego()
+
+    def _registrar_manejadores(self):
+        self.controlador_enemigos = ControladorEnemigos(
+            self, self.administrador_eventos
+        )
+        ControladorJugador(self, self.administrador_eventos)
+        ManejadorPotenciadores(self, self.administrador_eventos)
+        ManejadorColisiones(self, self.administrador_eventos)
+        ManejadorEstrellas(self, self.administrador_eventos)
+        ManejadorMenu(self, self.administrador_eventos)
+
     def ejecutar(self):
         while True:
             for evento in pygame.event.get():
@@ -74,7 +239,10 @@ class Juego:
                     pygame.quit()
                     exit()
                 if self.estado == "MENU":
+                    self.vista.limpiar_pantalla((0, 0, 0))
                     self.menu.manejar_eventos(evento)
+                    self.menu.dibujar()
+                    self.vista.actualizar()
                 elif self.estado == "JUEGO":
                     if evento.type == pygame.KEYDOWN:
                         if evento.key == pygame.K_ESCAPE:
@@ -101,6 +269,7 @@ class Juego:
                         elif evento.key == pygame.K_RIGHT:
                             self.direcciones_presionadas.discard("derecha")
                 elif self.estado == "GAME_OVER":
+                    self.vista.limpiar_pantalla((30, 0, 0))
                     if evento.type == pygame.KEYDOWN:
                         if evento.key == pygame.K_ESCAPE:
                             self.estado = "MENU"
@@ -111,9 +280,46 @@ class Juego:
                             self.nivel_actual = 0
                             self._reiniciar_juego()
                             self.estado = "JUEGO"
+                    self.vista.dibujar_texto("GAME OVER", 220, 200, 72, (255, 80, 80))
+                    self.vista.dibujar_texto(
+                        f"Puntaje final: {self.puntuacion_final}",
+                        200,
+                        280,
+                        36,
+                        (255, 255, 255),
+                    )
+                    self.vista.dibujar_texto(
+                        "ENTER: Reintentar ESC: Menú", 160, 340, 28, (220, 220, 220)
+                    )
+                    self.vista.actualizar()
                 elif self.estado == "SALÓN_DE_LA_FAMA":
-                    if evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
-                        self.estado = "MENU"
+                    self.vista.limpiar_pantalla((0, 0, 50))
+                    self.vista.dibujar_texto(
+                        "Salón de la Fama", 150, 200, 48, (255, 255, 0)
+                    )
+                    puntuaciones = self._cargar_json("puntuaciones.json", {})
+                    y_posicion = 270
+                    if isinstance(puntuaciones, dict):
+                        for usuario, scores in list(puntuaciones.items())[:10]:
+                            if scores and isinstance(scores, list):
+                                mejor_score = max(
+                                    [
+                                        s.get("puntuacion", 0)
+                                        for s in scores
+                                        if isinstance(s, dict)
+                                    ],
+                                    default=0,
+                                )
+                                self.vista.dibujar_texto(
+                                    f"{usuario}: {mejor_score}",
+                                    120,
+                                    y_posicion,
+                                    24,
+                                    (255, 255, 255),
+                                )
+                                y_posicion += 30
+                    self.vista.dibujar_texto("ESC: Volver", 120, 550, 32, (200, 200, 200))
+                    self.vista.actualizar()
             # SOLO actualizar y dibujar si el estado es JUEGO
             if self.estado == "JUEGO":
                 if self.direcciones_presionadas:
@@ -203,50 +409,20 @@ class Juego:
                 if self.mensaje_texto and self.cuadros_mensaje > 0:
                     self.vista.dibujar_texto(self.mensaje_texto, 120, 60, 32, (255, 64, 64))
                 self.vista.actualizar()
-            elif self.estado == "MENU":
-                self.vista.limpiar_pantalla((0, 0, 0))
-                self.menu.dibujar()
-                self.vista.actualizar()
-            elif self.estado == "GAME_OVER":
-                self.vista.limpiar_pantalla((30, 0, 0))
-                self.vista.dibujar_texto("GAME OVER", 220, 200, 72, (255, 80, 80))
-                self.vista.dibujar_texto(
-                    f"Puntaje final: {self.puntuacion_final}",
-                    200,
-                    280,
-                    36,
-                    (255, 255, 255),
-                )
-                self.vista.dibujar_texto(
-                    "ENTER: Reintentar ESC: Menú", 160, 340, 28, (220, 220, 220)
-                )
-                self.vista.actualizar()
-            elif self.estado == "SALÓN_DE_LA_FAMA":
-                self.vista.limpiar_pantalla((0, 0, 50))
-                self.vista.dibujar_texto(
-                    "Salón de la Fama", 150, 200, 48, (255, 255, 0)
-                )
-                puntuaciones = self._cargar_json("puntuaciones.json", {})
-                y_posicion = 270
-                if isinstance(puntuaciones, dict):
-                    for usuario, scores in list(puntuaciones.items())[:10]:
-                        if scores and isinstance(scores, list):
-                            mejor_score = max(
-                                [
-                                    s.get("puntuacion", 0)
-                                    for s in scores
-                                    if isinstance(s, dict)
-                                ],
-                                default=0,
-                            )
-                            self.vista.dibujar_texto(
-                                f"{usuario}: {mejor_score}",
-                                120,
-                                y_posicion,
-                                24,
-                                (255, 255, 255),
-                            )
-                            y_posicion += 30
-                self.vista.dibujar_texto("ESC: Volver", 120, 550, 32, (200, 200, 200))
-                self.vista.actualizar()
             self.reloj.tick(self.FPS)
+
+    def _cargar_json(self, ruta, por_defecto=None):
+        if not os.path.exists(ruta):
+            return por_defecto if por_defecto is not None else {}
+        try:
+            with open(ruta, "r", encoding="utf-8") as archivo:
+                texto = archivo.read().strip()
+                return (
+                    json.loads(texto)
+                    if texto
+                    else (por_defecto if por_defecto is not None else {})
+                )
+        except json.JSONDecodeError:
+            return por_defecto if por_defecto is not None else {}
+
+# ...INCLUYE AQUÍ el resto de los controladores y manejadores según la versión previa...
