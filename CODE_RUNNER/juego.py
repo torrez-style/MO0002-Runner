@@ -320,7 +320,9 @@ class Juego:
                     )
                 if self.cuadros_mensaje > 0:
                     self.cuadros_mensaje -= 1
-            self.controlador_enemigos.actualizar()
+            # Solo actualizar enemigos si el estado es JUEGO
+            if self.estado == "JUEGO":
+                self.controlador_enemigos.actualizar()
             self.vista.limpiar_pantalla((0, 0, 0))
             nivel_actual = self.niveles[self.nivel_actual]
             color_pared = tuple(
@@ -452,9 +454,13 @@ class ControladorJugador:
             and j.LABERINTO[nueva_y][nueva_x] == 0
         ):
             j.posicion_x, j.posicion_y = nueva_x, nueva_y
-            j.administrador_eventos.publicar(
-                EventoColisionEnemigo((j.posicion_x, j.posicion_y), (j.posicion_x, j.posicion_y))
-                                )
+            # Verificar colisión inmediata después del movimiento
+            for enemigo in j.enemigos:
+                if (nueva_x, nueva_y) == tuple(enemigo):
+                    j.administrador_eventos.publicar(
+                        EventoColisionEnemigo((j.posicion_x, j.posicion_y), tuple(enemigo))
+                    )
+                    break
 
 
 class ControladorEnemigos:
@@ -481,9 +487,11 @@ class ControladorEnemigos:
             )
             if siguiente:
                 j.enemigos[i] = siguiente
-            j.administrador_eventos.publicar(
-            EventoColisionEnemigo((j.posicion_x, j.posicion_y), tuple(j.enemigos[i]))         
-                                )
+                # Verificar colisión después de que el enemigo se mueva
+                if tuple(siguiente) == (j.posicion_x, j.posicion_y):
+                    j.administrador_eventos.publicar(
+                        EventoColisionEnemigo((j.posicion_x, j.posicion_y), tuple(siguiente))
+                    )
 
 
 class ManejadorPotenciadores:
@@ -506,15 +514,14 @@ class ManejadorColisiones:
         j = self.juego
         if j.potenciador_activo == "invulnerable":
             return
-        # FIX: Usar evento.posicion_jugador en lugar de evento.posicion
-        if evento.posicion_jugador in [(e[0], e[1]) for e in j.enemigos]:
-            if evento.posicion_jugador == (j.posicion_x, j.posicion_y):
-                j.vidas -= 1
-                if j.vidas > 0:
-                    j.posicion_x, j.posicion_y = j._obtener_celda_libre_jugador()
-                    j._recolocar_enemigos_si_vacio(j.niveles[j.nivel_actual])
-                else:
-                    j._cambiar_a_fin_de_juego()
+        # Solo procesar si realmente hay colisión
+        if evento.posicion_jugador == evento.posicion_enemigo:
+            j.vidas -= 1
+            if j.vidas > 0:
+                j.posicion_x, j.posicion_y = j._obtener_celda_libre_jugador()
+                j._recolocar_enemigos_si_vacio(j.niveles[j.nivel_actual])
+            else:
+                j._cambiar_a_fin_de_juego()
 
 
 class ManejadorEstrellas:
